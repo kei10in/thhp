@@ -1,3 +1,5 @@
+use std::slice::Iter;
+
 pub struct Request<'buffer> {
     pub method: &'buffer [u8],
     pub target: &'buffer [u8],
@@ -10,86 +12,80 @@ pub struct HeaderField<'buffer> {
 }
 
 pub fn parse_request<'buffer>(buf: &'buffer [u8]) -> Option<Request<'buffer>> {
-    if buf.is_empty() {
+    parse_request_impl(&mut buf.iter())
+}
+
+pub fn parse_request_impl<'buffer>(it: &mut Iter<'buffer, u8>) -> Option<Request<'buffer>> {
+    let mut s = it.as_slice();
+    let mut p = it.position(|x| *x == b' ');
+    if p.is_none() {
+        return None;
+    }
+    let method = &s[0..p.unwrap()];
+
+    s = it.as_slice();
+    p = it.position(|x| *x == b' ');
+    if p.is_none() {
+        return None;
+    }
+    let target = &s[0..p.unwrap()];
+
+    if !it.as_slice().starts_with(b"HTTP/") {
         return None;
     }
 
-    let mut s = 0;
-    let mut i = 0;
+    it.nth(4);
 
-    while buf[i] != b' ' {
-        i += 1;
-    }
-    let method_index = s..i;
-
-    i += 1;
-    s = i;
-
-    while buf[i] != b' ' {
-        i += 1;
-    }
-    let target_index = s..i;
-
-    i += 1;
-    s = i;
-
-    if &buf[s..s + 5] != b"HTTP/" {
+    s = it.as_slice();
+    p = it.position(|x| *x == b'\r');
+    if p.is_none() {
         return None;
     }
-
-    s += 5;
-    i = s;
-    while buf[i] != b'\r' {
-        i += 1;
-    }
-    let version_index = s..i;
+    let version = &s[0..p.unwrap()];
 
     return Some(Request::<'buffer> {
-        method: &buf[method_index],
-        target: &buf[target_index],
-        version: &buf[version_index],
+        method: method,
+        target: target,
+        version: version,
     });
 }
 
 pub fn parse_headers<'buffer>(buf: &'buffer [u8]) -> Vec<HeaderField<'buffer>> {
+    return parse_headers_impl(&mut buf.iter());
+}
+
+pub fn parse_headers_impl<'buffer>(it: &mut Iter<'buffer, u8>) -> Vec<HeaderField<'buffer>> {
     let mut result = Vec::<HeaderField<'buffer>>::new();
 
-    if buf.is_empty() {
-        return result;
-    }
-
-    let mut i = 0;
-
+    let mut s;
     loop {
-        if buf[i] == b'\r' {
+        s = it.as_slice();
+        if s[0] == b'\r' {
             break;
         }
 
-        let mut s = i;
-
-        while buf[i] != b':' {
-            i += 1;
+        let mut p = it.position(|x| *x == b':');
+        if p.is_none() {
+            return result;
         }
-        let name_index = s..i;
+        let name = &s[0..p.unwrap()];
 
-        i += 1;
-        s = i;
-
-        while buf[i] != b'\r' {
-            i += 1;
+        s = it.as_slice();
+        p = it.position(|x| *x == b'\r');
+        if p.is_none() {
+            return result;
         }
-        let value_index = s..i;
+        let value = &s[0..p.unwrap()];
 
-        i += 1;
-
-        if buf[i] == b'\n' {
-            i += 1;
-        }
-
-        result.push(HeaderField {
-            name: &buf[name_index],
-            value: &buf[value_index],
+        result.push(HeaderField::<'buffer> {
+            name: name,
+            value: value,
         });
+
+        s = it.as_slice();
+        if s[0] == b'\n' {
+            it.next();
+        }
     }
 
     return result;
