@@ -1,4 +1,11 @@
+#[macro_use]
+extern crate error_chain;
+
 use std::slice::Iter;
+
+mod errors;
+
+pub use errors::*;
 
 pub struct Request<'buffer> {
     pub method: &'buffer [u8],
