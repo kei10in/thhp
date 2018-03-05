@@ -25,30 +25,30 @@ pub struct HeaderField<'buffer> {
 pub fn parse_request<'buffer, 'header>(
     buf: &'buffer [u8],
     headers: &'header mut Vec<HeaderField<'buffer>>,
-) -> Option<Request<'buffer, 'header>> {
+) -> Result<Request<'buffer, 'header>> {
     parse_request_impl(&mut buf.iter(), headers)
 }
 
 pub fn parse_request_impl<'buffer, 'header>(
     it: &mut Iter<'buffer, u8>,
     headers: &'header mut Vec<HeaderField<'buffer>>,
-) -> Option<Request<'buffer, 'header>> {
+) -> Result<Request<'buffer, 'header>> {
     let mut s = it.as_slice();
     let mut p = it.position(|x| *x == b' ');
     if p.is_none() {
-        return None;
+        return Err(ErrorKind::InvalidHeaderFormat.into());
     }
     let method = &s[0..p.unwrap()];
 
     s = it.as_slice();
     p = it.position(|x| *x == b' ');
     if p.is_none() {
-        return None;
+        return Err(ErrorKind::InvalidHeaderFormat.into());
     }
     let target = &s[0..p.unwrap()];
 
     if !it.as_slice().starts_with(b"HTTP/") {
-        return None;
+        return Err(ErrorKind::InvalidHeaderFormat.into());
     }
 
     it.nth(4);
@@ -56,11 +56,15 @@ pub fn parse_request_impl<'buffer, 'header>(
     s = it.as_slice();
     p = it.position(|x| *x == b'\r');
     if p.is_none() {
-        return None;
+        return Err(ErrorKind::InvalidHeaderFormat.into());
     }
     let version = &s[0..p.unwrap()];
 
-    return Some(Request::<'buffer, 'header> {
+    it.next(); // '\n'
+
+    parse_headers_impl(it, headers)?;
+
+    return Ok(Request::<'buffer, 'header> {
         method: method,
         target: target,
         version: version,
@@ -79,6 +83,10 @@ pub fn parse_headers_impl<'buffer, 'header>(
     it: &mut Iter<'buffer, u8>,
     result: &'header mut Vec<HeaderField<'buffer>>,
 ) -> Result<()> {
+    if it.len() == 0 {
+        return Err(ErrorKind::Incomplete.into());
+    }
+
     let mut s;
     loop {
         s = it.as_slice();
@@ -121,29 +129,21 @@ mod tests {
     fn empty_request_is_unparsable() {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
         let result = parse_request(b"", &mut headers);
-        assert!(result.is_none());
+        assert!(result.is_err());
     }
 
     #[test]
     fn parse_get_request() {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
-        let result = parse_request(b"GET / HTTP/1.1\r\n", &mut headers);
-        assert!(result.is_some());
+        let result = parse_request(b"GET / HTTP/1.1\r\nname:value\r\n\r\n", &mut headers);
+        assert!(result.is_ok());
         let req = result.unwrap();
         assert_eq!(req.method, b"GET");
         assert_eq!(req.target, b"/");
         assert_eq!(req.version, b"1.1");
-    }
-
-    #[test]
-    fn parse_post_request() {
-        let mut headers = Vec::<HeaderField>::with_capacity(10);
-        let result = parse_request(b"POST / HTTP/1.1\r\n", &mut headers);
-        assert!(result.is_some());
-        let req = result.unwrap();
-        assert_eq!(req.method, b"POST");
-        assert_eq!(req.target, b"/");
-        assert_eq!(req.version, b"1.1");
+        assert_eq!(req.headers.len(), 1);
+        assert_eq!(req.headers[0].name, b"name");
+        assert_eq!(req.headers[0].value, b"value");
     }
 
     #[test]
