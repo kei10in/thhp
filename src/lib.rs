@@ -22,54 +22,56 @@ pub struct HeaderField<'buffer> {
     pub value: &'buffer [u8],
 }
 
-pub fn parse_request<'buffer, 'header>(
-    buf: &'buffer [u8],
-    headers: &'header mut Vec<HeaderField<'buffer>>,
-) -> Result<Request<'buffer, 'header>> {
-    parse_request_impl(&mut buf.iter(), headers)
-}
-
-pub fn parse_request_impl<'buffer, 'header>(
-    it: &mut Iter<'buffer, u8>,
-    headers: &'header mut Vec<HeaderField<'buffer>>,
-) -> Result<Request<'buffer, 'header>> {
-    let mut s = it.as_slice();
-    let mut p = it.position(|x| *x == b' ');
-    if p.is_none() {
-        return Err(ErrorKind::InvalidHeaderFormat.into());
-    }
-    let method = &s[0..p.unwrap()];
-
-    s = it.as_slice();
-    p = it.position(|x| *x == b' ');
-    if p.is_none() {
-        return Err(ErrorKind::InvalidHeaderFormat.into());
-    }
-    let target = &s[0..p.unwrap()];
-
-    if !it.as_slice().starts_with(b"HTTP/") {
-        return Err(ErrorKind::InvalidHeaderFormat.into());
+impl<'buffer, 'header> Request<'buffer, 'header> {
+    pub fn parse(
+        buf: &'buffer [u8],
+        headers: &'header mut Vec<HeaderField<'buffer>>,
+    ) -> Result<Request<'buffer, 'header>> {
+        Request::parse_impl(&mut buf.iter(), headers)
     }
 
-    it.nth(4);
+    fn parse_impl(
+        it: &mut Iter<'buffer, u8>,
+        headers: &'header mut Vec<HeaderField<'buffer>>,
+    ) -> Result<Request<'buffer, 'header>> {
+        let mut s = it.as_slice();
+        let mut p = it.position(|x| *x == b' ');
+        if p.is_none() {
+            return Err(ErrorKind::InvalidHeaderFormat.into());
+        }
+        let method = &s[0..p.unwrap()];
 
-    s = it.as_slice();
-    p = it.position(|x| *x == b'\r');
-    if p.is_none() {
-        return Err(ErrorKind::InvalidHeaderFormat.into());
+        s = it.as_slice();
+        p = it.position(|x| *x == b' ');
+        if p.is_none() {
+            return Err(ErrorKind::InvalidHeaderFormat.into());
+        }
+        let target = &s[0..p.unwrap()];
+
+        if !it.as_slice().starts_with(b"HTTP/") {
+            return Err(ErrorKind::InvalidHeaderFormat.into());
+        }
+
+        it.nth(4);
+
+        s = it.as_slice();
+        p = it.position(|x| *x == b'\r');
+        if p.is_none() {
+            return Err(ErrorKind::InvalidHeaderFormat.into());
+        }
+        let version = &s[0..p.unwrap()];
+
+        it.next(); // '\n'
+
+        parse_headers_impl(it, headers)?;
+
+        return Ok(Request::<'buffer, 'header> {
+            method: method,
+            target: target,
+            version: version,
+            headers: headers,
+        });
     }
-    let version = &s[0..p.unwrap()];
-
-    it.next(); // '\n'
-
-    parse_headers_impl(it, headers)?;
-
-    return Ok(Request::<'buffer, 'header> {
-        method: method,
-        target: target,
-        version: version,
-        headers: headers,
-    });
 }
 
 pub fn parse_headers<'buffer, 'header>(
@@ -128,14 +130,14 @@ mod tests {
     #[test]
     fn empty_request_is_unparsable() {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
-        let result = parse_request(b"", &mut headers);
+        let result = Request::parse(b"", &mut headers);
         assert!(result.is_err());
     }
 
     #[test]
     fn parse_get_request() {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
-        let result = parse_request(b"GET / HTTP/1.1\r\nname:value\r\n\r\n", &mut headers);
+        let result = Request::parse(b"GET / HTTP/1.1\r\nname:value\r\n\r\n", &mut headers);
         assert!(result.is_ok());
         let req = result.unwrap();
         assert_eq!(req.method, b"GET");
