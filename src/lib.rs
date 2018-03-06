@@ -91,6 +91,17 @@ fn parse_http_version(buf: &[u8]) -> Result<usize> {
     }
 }
 
+#[inline]
+fn parse_eol(buf: &[u8]) -> Option<usize> {
+    if buf.get(0) == Some(&b'\r') && buf.get(1) == Some(&b'\n') {
+        Some(2)
+    } else if buf.get(0) == Some(&b'\n') {
+        Some(1)
+    } else {
+        None
+    }
+}
+
 impl<'buffer, 'header> Request<'buffer, 'header> {
     pub fn parse(
         buf: &'buffer [u8],
@@ -120,8 +131,10 @@ impl<'buffer, 'header> Request<'buffer, 'header> {
         i += parse_http_version(&buf[i..])?;
         let version = &buf.get(s..i).unwrap();
 
-        i += 1;
-        i += 1; // '\n'
+        match parse_eol(&buf[i..]) {
+            Some(c) => i += c,
+            None => return Err(InvalidHeaderFormat.into()),
+        }
 
         parse_headers(&buf[i..], headers)?;
 
@@ -145,7 +158,7 @@ pub fn parse_headers<'buffer, 'header>(
     let mut s;
     let mut i = 0;
     loop {
-        if buf[i] == b'\r' {
+        if parse_eol(&buf[i..]).is_some() {
             break;
         }
 
@@ -222,6 +235,15 @@ mod tests {
         assert_eq!(headers[1].value, b"value2");
     }
 
+    #[test]
+    fn good() {
+        let mut headers = Vec::<HeaderField>::with_capacity(10);
+        assert!(Request::parse(b"GET / HTTP/1.1\r\n\r\n", &mut headers).is_ok());
+        assert!(Request::parse(b"GET / HTTP/1.1\n\n", &mut headers).is_ok());
+        assert!(Request::parse(b"GET / HTTP/1.1\r\n\n", &mut headers).is_ok());
+        assert!(Request::parse(b"GET / HTTP/1.1\n\r\n", &mut headers).is_ok());
+    }
+
     fn fail(r: Result<Request>, err: ErrorKind) {
         assert!(r.is_err());
         assert_eq!(*r.err().unwrap().kind(), err);
@@ -248,6 +270,10 @@ mod tests {
         );
         fail(
             Request::parse(b"G1ET / HTTP/A.1\r\n\r\n", &mut headers),
+            InvalidHeaderFormat,
+        );
+        fail(
+            Request::parse(b"G1ET / HTTP/1.A\r\n\r\n", &mut headers),
             InvalidHeaderFormat,
         );
         fail(
