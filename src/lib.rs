@@ -1,8 +1,6 @@
 #[macro_use]
 extern crate error_chain;
 
-use std::slice::Iter;
-
 mod errors;
 
 pub use errors::*;
@@ -22,48 +20,58 @@ pub struct HeaderField<'buffer> {
     pub value: &'buffer [u8],
 }
 
+#[inline]
+fn position<P>(buf: &[u8], mut predicate: P) -> Result<usize>
+where
+    P: FnMut(&u8) -> bool,
+{
+    let mut i = 0;
+    loop {
+        if let Some(c) = buf.get(i) {
+            if predicate(c) {
+                return Ok(i);
+            }
+            i += 1;
+        } else {
+            return Err(ErrorKind::InvalidHeaderFormat.into());
+        }
+    }
+}
+
 impl<'buffer, 'header> Request<'buffer, 'header> {
     pub fn parse(
         buf: &'buffer [u8],
         headers: &'header mut Vec<HeaderField<'buffer>>,
     ) -> Result<Request<'buffer, 'header>> {
-        Request::parse_impl(&mut buf.iter(), headers)
-    }
+        let mut s = 0;
+        let mut i = 0;
 
-    fn parse_impl(
-        it: &mut Iter<'buffer, u8>,
-        headers: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<Request<'buffer, 'header>> {
-        let mut s = it.as_slice();
-        let mut p = it.position(|x| *x == b' ');
-        if p.is_none() {
-            return Err(ErrorKind::InvalidHeaderFormat.into());
-        }
-        let method = &s[0..p.unwrap()];
+        i += position(buf, |&x| x == b' ')?;
+        let method = &buf.get(s..i).unwrap();
 
-        s = it.as_slice();
-        p = it.position(|x| *x == b' ');
-        if p.is_none() {
-            return Err(ErrorKind::InvalidHeaderFormat.into());
-        }
-        let target = &s[0..p.unwrap()];
+        i += 1;
+        s = i;
 
-        if !it.as_slice().starts_with(b"HTTP/") {
+        i += position(&buf.get(i..).unwrap(), |&x| x == b' ')?;
+
+        let target = &buf.get(s..i).unwrap();
+
+        i += 1;
+
+        if !buf.get(i..).unwrap().starts_with(b"HTTP/") {
             return Err(ErrorKind::InvalidHeaderFormat.into());
         }
 
-        it.nth(4);
+        i += 5;
+        s = i;
 
-        s = it.as_slice();
-        p = it.position(|x| *x == b'\r');
-        if p.is_none() {
-            return Err(ErrorKind::InvalidHeaderFormat.into());
-        }
-        let version = &s[0..p.unwrap()];
+        i += position(&buf.get(i..).unwrap(), |&x| x == b'\r')?;
+        let version = &buf.get(s..i).unwrap();
 
-        it.next(); // '\n'
+        i += 1;
+        i += 1; // '\n'
 
-        parse_headers_impl(it, headers)?;
+        parse_headers(&buf[i..], headers)?;
 
         return Ok(Request::<'buffer, 'header> {
             method: method,
@@ -78,45 +86,37 @@ pub fn parse_headers<'buffer, 'header>(
     buf: &'buffer [u8],
     result: &'header mut Vec<HeaderField<'buffer>>,
 ) -> Result<()> {
-    return parse_headers_impl(&mut buf.iter(), result);
-}
-
-pub fn parse_headers_impl<'buffer, 'header>(
-    it: &mut Iter<'buffer, u8>,
-    result: &'header mut Vec<HeaderField<'buffer>>,
-) -> Result<()> {
-    if it.len() == 0 {
+    if buf.len() == 0 {
         return Err(ErrorKind::Incomplete.into());
     }
 
     let mut s;
+    let mut i = 0;
     loop {
-        s = it.as_slice();
-        if s[0] == b'\r' {
+        if buf[i] == b'\r' {
             break;
         }
 
-        let mut p = it.position(|x| *x == b':');
-        if p.is_none() {
-            return Err(ErrorKind::InvalidHeaderFormat.into());
-        }
-        let name = &s[0..p.unwrap()];
+        s = i;
 
-        s = it.as_slice();
-        p = it.position(|x| *x == b'\r');
-        if p.is_none() {
-            return Err(ErrorKind::InvalidHeaderFormat.into());
-        }
-        let value = &s[0..p.unwrap()];
+        i += position(&buf[i..], |&x| x == b':')?;
+        let name = s..i;
+
+        i += 1;
+
+        s = i;
+        i += position(&buf[i..], |&x| x == b'\r')?;
+        let value = s..i;
+
+        i += 1;
 
         result.push(HeaderField::<'buffer> {
-            name: name,
-            value: value,
+            name: &buf[name],
+            value: &buf[value],
         });
 
-        s = it.as_slice();
-        if s[0] == b'\n' {
-            it.next();
+        if buf[i] == b'\n' {
+            i += 1;
         }
     }
 
