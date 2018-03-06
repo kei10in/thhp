@@ -21,6 +21,16 @@ pub struct HeaderField<'buffer> {
 }
 
 #[inline]
+fn is_tchar(c: u8) -> bool {
+    0x20 <= c && c <= 0x7E
+}
+
+#[inline]
+fn is_digit(c: u8) -> bool {
+    b'0' <= c && c <= b'9'
+}
+
+#[inline]
 fn position<P>(buf: &[u8], mut predicate: P) -> Result<usize>
 where
     P: FnMut(&u8) -> bool,
@@ -36,11 +46,6 @@ where
             return Err(InvalidHeaderFormat.into());
         }
     }
-}
-
-#[inline]
-fn is_tchar(c: u8) -> bool {
-    0x20 <= c && c <= 0x7E
 }
 
 #[inline]
@@ -73,6 +78,19 @@ fn parse_token(buf: &[u8]) -> Result<usize> {
     read_until(buf, |&x| x == b' ', |&x| is_tchar(x))
 }
 
+#[inline]
+fn parse_http_version(buf: &[u8]) -> Result<usize> {
+    if buf.len() < 3 {
+        return Err(Incomplete.into());
+    }
+
+    if buf[0] == b'1' && buf[1] == b'.' && is_digit(buf[2]) {
+        return Ok(3);
+    } else {
+        return Err(InvalidHeaderFormat.into());
+    }
+}
+
 impl<'buffer, 'header> Request<'buffer, 'header> {
     pub fn parse(
         buf: &'buffer [u8],
@@ -99,7 +117,7 @@ impl<'buffer, 'header> Request<'buffer, 'header> {
         i += 5;
         s = i;
 
-        i += position(&buf.get(i..).unwrap(), |&x| x == b'\r')?;
+        i += parse_http_version(&buf[i..])?;
         let version = &buf.get(s..i).unwrap();
 
         i += 1;
@@ -218,6 +236,22 @@ mod tests {
         );
         fail(
             Request::parse(b"G1ET /a\x01ef HTTP/1.1\r\n\r\n", &mut headers),
+            InvalidHeaderFormat,
+        );
+        fail(
+            Request::parse(b"G1ET / HOGE\r\n\r\n", &mut headers),
+            InvalidHeaderFormat,
+        );
+        fail(
+            Request::parse(b"G1ET / HTTP/11.1\r\n\r\n", &mut headers),
+            InvalidHeaderFormat,
+        );
+        fail(
+            Request::parse(b"G1ET / HTTP/A.1\r\n\r\n", &mut headers),
+            InvalidHeaderFormat,
+        );
+        fail(
+            Request::parse(b"G1ET / HTTP/1.A\r\n\r\n", &mut headers),
             InvalidHeaderFormat,
         );
     }
