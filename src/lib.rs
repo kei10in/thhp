@@ -33,9 +33,44 @@ where
             }
             i += 1;
         } else {
-            return Err(ErrorKind::InvalidHeaderFormat.into());
+            return Err(InvalidHeaderFormat.into());
         }
     }
+}
+
+#[inline]
+fn is_tchar(c: u8) -> bool {
+    0x20 <= c && c <= 0x7E
+}
+
+#[inline]
+fn read_until<D, A>(buf: &[u8], mut delimitor: D, mut acceptable: A) -> Result<usize>
+where
+    D: FnMut(&u8) -> bool,
+    A: FnMut(&u8) -> bool,
+{
+    let mut i = 0;
+    loop {
+        match buf.get(i) {
+            Some(c) => {
+                if delimitor(c) {
+                    return Ok(i);
+                }
+
+                if !acceptable(c) {
+                    return Err(InvalidHeaderFormat.into());
+                }
+
+                i += 1;
+            }
+            None => return Err(InvalidHeaderFormat.into()),
+        }
+    }
+}
+
+#[inline]
+fn parse_token(buf: &[u8]) -> Result<usize> {
+    read_until(buf, |&x| x == b' ', |&x| is_tchar(x))
 }
 
 impl<'buffer, 'header> Request<'buffer, 'header> {
@@ -46,15 +81,14 @@ impl<'buffer, 'header> Request<'buffer, 'header> {
         let mut s = 0;
         let mut i = 0;
 
-        i += position(buf, |&x| x == b' ')?;
-        let method = &buf.get(s..i).unwrap();
+        i += parse_token(buf)?;
+        let method = unsafe { buf.get_unchecked(s..i) };
 
         i += 1;
         s = i;
 
-        i += position(&buf.get(i..).unwrap(), |&x| x == b' ')?;
-
-        let target = &buf.get(s..i).unwrap();
+        i += parse_token(&buf[i..])?;
+        let target = unsafe { buf.get_unchecked(s..i) };
 
         i += 1;
 
@@ -168,5 +202,23 @@ mod tests {
         assert_eq!(headers[0].value, b"value1");
         assert_eq!(headers[1].name, b"name2");
         assert_eq!(headers[1].value, b"value2");
+    }
+
+    fn fail(r: Result<Request>, err: ErrorKind) {
+        assert!(r.is_err());
+        assert_eq!(*r.err().unwrap().kind(), err);
+    }
+
+    #[test]
+    fn failures() {
+        let mut headers = Vec::<HeaderField>::with_capacity(10);
+        fail(
+            Request::parse(b"G\x01ET / HTTP/1.1\r\n\r\n", &mut headers),
+            InvalidHeaderFormat,
+        );
+        fail(
+            Request::parse(b"G1ET /a\x01ef HTTP/1.1\r\n\r\n", &mut headers),
+            InvalidHeaderFormat,
+        );
     }
 }
