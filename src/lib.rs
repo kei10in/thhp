@@ -257,27 +257,27 @@ mod tests {
             InvalidHeaderFormat,
         );
         fail(
-            Request::parse(b"G1ET /a\x01ef HTTP/1.1\r\n\r\n", &mut headers),
+            Request::parse(b"GET /a\x01ef HTTP/1.1\r\n\r\n", &mut headers),
             InvalidHeaderFormat,
         );
         fail(
-            Request::parse(b"G1ET / HOGE\r\n\r\n", &mut headers),
+            Request::parse(b"GET / HOGE\r\n\r\n", &mut headers),
             InvalidHeaderFormat,
         );
         fail(
-            Request::parse(b"G1ET / HTTP/11.1\r\n\r\n", &mut headers),
+            Request::parse(b"GET / HTTP/11.1\r\n\r\n", &mut headers),
             InvalidHeaderFormat,
         );
         fail(
-            Request::parse(b"G1ET / HTTP/A.1\r\n\r\n", &mut headers),
+            Request::parse(b"GET / HTTP/A.1\r\n\r\n", &mut headers),
             InvalidHeaderFormat,
         );
         fail(
-            Request::parse(b"G1ET / HTTP/1.A\r\n\r\n", &mut headers),
+            Request::parse(b"GET / HTTP/1.A\r\n\r\n", &mut headers),
             InvalidHeaderFormat,
         );
         fail(
-            Request::parse(b"G1ET / HTTP/1.A\r\n\r\n", &mut headers),
+            Request::parse(b"GET / HTTP/1.A\r\n\r\n", &mut headers),
             InvalidHeaderFormat,
         );
     }
