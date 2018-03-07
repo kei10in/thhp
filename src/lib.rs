@@ -20,14 +20,95 @@ pub struct HeaderField<'buffer> {
     pub value: &'buffer [u8],
 }
 
+macro_rules! make_bool_table {
+    ($($v:expr,)*) => ([
+        $($v != 0,)*
+    ])
+}
+
+#[cfg_attr(rustfmt, rustfmt_skip)]
+const TCHAR_MAP: [bool; 256] = make_bool_table![
+    // Control characters
+// \0                   \a \b \t \n \v \f \r
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//                                  \e
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+
+    // Visible characters
+// SP  !  "  #  $  %  &  '  (  )  *  +  ,  -  .  /
+    0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 0,
+//  0  1  2  3  4  5  6  7  8  9  :  ;  <  =  >  ?
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0,
+//  @  A  B  C  D  E  F  G  H  I  J  K  L  M  N  O
+    0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+//  P  Q  R  S  T  U  V  W  X  Y  Z  [  \  ]  ^  _
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1,
+//  `  a  b  c  d  e  f  g  h  i  j  k  l  m  n  o
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+//  p  q  r  s  t  u  v  w  x  y  z  {  |  }  ~
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0,
+
+    // Non ascii characters
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];
+
 #[inline]
 fn is_tchar(c: u8) -> bool {
-    0x20 <= c && c <= 0x7E
+    TCHAR_MAP[c as usize]
+}
+
+#[inline]
+fn is_vchar(c: u8) -> bool {
+    0x20 < c && c < 0x7F
 }
 
 #[inline]
 fn is_digit(c: u8) -> bool {
     b'0' <= c && c <= b'9'
+}
+
+#[cfg_attr(rustfmt, rustfmt_skip)]
+const FIELD_VALUE_CHAR_MAP: [bool; 256] = make_bool_table![
+    // Control characters
+// \0                   \a \b \t \n \v \f \r
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+//                                  \e
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+
+    // Visible characters
+// SP  !  "  #  $  %  &  '  (  )  *  +  ,  -  .  /
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+//  0  1  2  3  4  5  6  7  8  9  :  ;  <  =  >  ?
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+//  @  A  B  C  D  E  F  G  H  I  J  K  L  M  N  O
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+//  P  Q  R  S  T  U  V  W  X  Y  Z  [  \  ]  ^  _
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+//  `  a  b  c  d  e  f  g  h  i  j  k  l  m  n  o
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+//  p  q  r  s  t  u  v  w  x  y  z  {  |  }  ~
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
+
+    // Non ascii characters
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];
+
+fn is_field_value_char(c: u8) -> bool {
+    FIELD_VALUE_CHAR_MAP[c as usize]
 }
 
 #[inline]
@@ -56,8 +137,13 @@ where
 }
 
 #[inline]
-fn parse_token(buf: &[u8]) -> Result<usize> {
+fn parse_method(buf: &[u8]) -> Result<usize> {
     read_until(buf, |&x| x == b' ', |&x| is_tchar(x))
+}
+
+#[inline]
+fn parse_target(buf: &[u8]) -> Result<usize> {
+    read_until(buf, |&x| x == b' ', |&x| is_vchar(x))
 }
 
 #[inline]
@@ -80,7 +166,11 @@ fn parse_field_name(buf: &[u8]) -> Result<usize> {
 
 #[inline]
 fn parse_field_value(buf: &[u8]) -> Result<usize> {
-    read_until(buf, |&x| x == b'\r' || x == b'\n', |&x| is_tchar(x))
+    read_until(
+        buf,
+        |&x| x == b'\r' || x == b'\n',
+        |&x| is_field_value_char(x),
+    )
 }
 
 #[inline]
@@ -102,13 +192,13 @@ impl<'buffer, 'header> Request<'buffer, 'header> {
         let mut s = 0;
         let mut i = 0;
 
-        i += parse_token(buf)?;
+        i += parse_method(buf)?;
         let method = unsafe { buf.get_unchecked(s..i) };
 
         i += 1;
         s = i;
 
-        i += parse_token(&buf[i..])?;
+        i += parse_target(&buf[i..])?;
         let target = unsafe { buf.get_unchecked(s..i) };
 
         i += 1;
