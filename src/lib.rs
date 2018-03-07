@@ -92,6 +92,11 @@ fn parse_http_version(buf: &[u8]) -> Result<usize> {
 }
 
 #[inline]
+fn parse_field_name(buf: &[u8]) -> Result<usize> {
+    read_until(buf, |&x| x == b':', |&x| is_tchar(x))
+}
+
+#[inline]
 fn parse_eol(buf: &[u8]) -> Option<usize> {
     if buf.get(0) == Some(&b'\r') && buf.get(1) == Some(&b'\n') {
         Some(2)
@@ -164,7 +169,7 @@ pub fn parse_headers<'buffer, 'header>(
 
         s = i;
 
-        i += position(&buf[i..], |&x| x == b':')?;
+        i += parse_field_name(buf)?;
         let name = s..i;
 
         i += 1;
@@ -278,6 +283,10 @@ mod tests {
         );
         fail(
             Request::parse(b"GET / HTTP/1.A\r\n\r\n", &mut headers),
+            InvalidHeaderFormat,
+        );
+        fail(
+            Request::parse(b"GET / HTTP/1.1\r\na\x01b:xyz\r\n\r\n", &mut headers),
             InvalidHeaderFormat,
         );
     }
