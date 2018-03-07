@@ -31,24 +31,6 @@ fn is_digit(c: u8) -> bool {
 }
 
 #[inline]
-fn position<P>(buf: &[u8], mut predicate: P) -> Result<usize>
-where
-    P: FnMut(&u8) -> bool,
-{
-    let mut i = 0;
-    loop {
-        if let Some(c) = buf.get(i) {
-            if predicate(c) {
-                return Ok(i);
-            }
-            i += 1;
-        } else {
-            return Err(InvalidHeaderFormat.into());
-        }
-    }
-}
-
-#[inline]
 fn read_until<D, A>(buf: &[u8], mut delimitor: D, mut acceptable: A) -> Result<usize>
 where
     D: FnMut(&u8) -> bool,
@@ -94,6 +76,11 @@ fn parse_http_version(buf: &[u8]) -> Result<usize> {
 #[inline]
 fn parse_field_name(buf: &[u8]) -> Result<usize> {
     read_until(buf, |&x| x == b':', |&x| is_tchar(x))
+}
+
+#[inline]
+fn parse_field_value(buf: &[u8]) -> Result<usize> {
+    read_until(buf, |&x| x == b'\r' || x == b'\n', |&x| is_tchar(x))
 }
 
 #[inline]
@@ -175,18 +162,17 @@ pub fn parse_headers<'buffer, 'header>(
         i += 1;
 
         s = i;
-        i += position(&buf[i..], |&x| x == b'\r')?;
+        i += parse_field_value(&buf[i..])?;
         let value = s..i;
-
-        i += 1;
 
         result.push(HeaderField::<'buffer> {
             name: &buf[name],
             value: &buf[value],
         });
 
-        if buf[i] == b'\n' {
-            i += 1;
+        match parse_eol(&buf[i..]) {
+            Some(c) => i += c,
+            None => return Err(InvalidHeaderFormat.into()),
         }
     }
 
@@ -247,6 +233,10 @@ mod tests {
         assert!(Request::parse(b"GET / HTTP/1.1\n\n", &mut headers).is_ok());
         assert!(Request::parse(b"GET / HTTP/1.1\r\n\n", &mut headers).is_ok());
         assert!(Request::parse(b"GET / HTTP/1.1\n\r\n", &mut headers).is_ok());
+        assert!(Request::parse(b"GET / HTTP/1.1\r\na:b\r\n\r\n", &mut headers).is_ok());
+        assert!(Request::parse(b"GET / HTTP/1.1\r\na:b\r\n\n", &mut headers).is_ok());
+        assert!(Request::parse(b"GET / HTTP/1.1\r\na:b\n\n", &mut headers).is_ok());
+        assert!(Request::parse(b"GET / HTTP/1.1\r\na:b\n\r\n", &mut headers).is_ok());
     }
 
     fn fail(r: Result<Request>, err: ErrorKind) {
@@ -287,6 +277,10 @@ mod tests {
         );
         fail(
             Request::parse(b"GET / HTTP/1.1\r\na\x01b:xyz\r\n\r\n", &mut headers),
+            InvalidHeaderFormat,
+        );
+        fail(
+            Request::parse(b"GET / HTTP/1.1\r\nabc:x\x01z\r\n\r\n", &mut headers),
             InvalidHeaderFormat,
         );
     }
