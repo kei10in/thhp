@@ -1,7 +1,7 @@
 error_chain! {
     errors {
         Incomplete
-        InvalidHeaderFormat
+        InvalidFormat
     }
 }
 
@@ -11,7 +11,7 @@ impl PartialEq<ErrorKind> for ErrorKind {
     fn eq(&self, other: &ErrorKind) -> bool {
         match (self, other) {
             (&Incomplete, &Incomplete) => true,
-            (&InvalidHeaderFormat, &InvalidHeaderFormat) => true,
+            (&InvalidFormat, &InvalidFormat) => true,
             _ => false,
         }
     }
