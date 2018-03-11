@@ -1,3 +1,5 @@
+use std::str;
+
 #[macro_use]
 extern crate error_chain;
 
@@ -15,6 +17,36 @@ where
     pub target: &'buffer [u8],
     pub version: &'buffer [u8],
     pub headers: &'header Vec<HeaderField<'buffer>>,
+}
+
+impl<'buffer, 'header> Request<'buffer, 'header> {
+    pub fn parse(
+        buf: &'buffer [u8],
+        headers: &'header mut Vec<HeaderField<'buffer>>,
+    ) -> Result<Request<'buffer, 'header>> {
+        let mut parser = HttpPartParser::new(buf);
+        return parser.parse_request(headers);
+    }
+}
+
+pub struct Response<'buffer, 'header>
+where
+    'buffer: 'header,
+{
+    pub version: &'buffer [u8],
+    pub status: u16,
+    pub reason: &'buffer [u8],
+    pub headers: &'header Vec<HeaderField<'buffer>>,
+}
+
+impl<'buffer, 'header> Response<'buffer, 'header> {
+    pub fn parse(
+        buf: &'buffer [u8],
+        headers: &'header mut Vec<HeaderField<'buffer>>,
+    ) -> Result<Response<'buffer, 'header>> {
+        let mut parser = HttpPartParser::new(buf);
+        return parser.parse_response(headers);
+    }
 }
 
 pub struct HeaderField<'buffer> {
@@ -74,6 +106,44 @@ fn is_vchar(c: u8) -> bool {
 #[inline]
 fn is_digit(c: u8) -> bool {
     b'0' <= c && c <= b'9'
+}
+
+#[cfg_attr(rustfmt, rustfmt_skip)]
+const REASON_CHAR_MAP: [bool; 256] = make_bool_table![
+    // Control characters
+// \0                   \a \b \t \n \v \f \r
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+//                                  \e
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+
+    // Visible characters
+// SP  !  "  #  $  %  &  '  (  )  *  +  ,  -  .  /
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+//  0  1  2  3  4  5  6  7  8  9  :  ;  <  =  >  ?
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+//  @  A  B  C  D  E  F  G  H  I  J  K  L  M  N  O
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+//  P  Q  R  S  T  U  V  W  X  Y  Z  [  \  ]  ^  _
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+//  `  a  b  c  d  e  f  g  h  i  j  k  l  m  n  o
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+//  p  q  r  s  t  u  v  w  x  y  z  {  |  }  ~
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
+
+    // Non ascii characters
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];
+
+#[inline]
+fn is_reason_char(c: u8) -> bool {
+    REASON_CHAR_MAP[c as usize]
 }
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -148,6 +218,28 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
+    fn parse_response<'header>(
+        &mut self,
+        headers: &'header mut Vec<HeaderField<'buffer>>,
+    ) -> Result<Response<'buffer, 'header>> {
+        let version = self.parse_http_version()?;
+        self.consume_space()?;
+        let status = self.parse_status_code()?;
+        self.consume_space()?;
+        let reason = self.parse_reason_phrase()?;
+        self.consume_eol()?;
+
+        self.parse_headers(headers)?;
+
+        return Ok(Response::<'buffer, 'header> {
+            version: version,
+            status: status,
+            reason: reason,
+            headers: headers,
+        });
+    }
+
+    #[inline]
     fn eof(&mut self) -> bool {
         self.scanner.empty()
     }
@@ -182,6 +274,27 @@ impl<'buffer> HttpPartParser<'buffer> {
             }
             None => Err(Incomplete.into()),
         }
+    }
+
+    #[inline]
+    fn parse_status_code(&mut self) -> Result<u16> {
+        match self.scanner.read_while(|x| is_digit(x)) {
+            Some(v) => if v.len() == 3 {
+                unsafe { str::from_utf8_unchecked(v) }
+                    .parse::<u16>()
+                    .or(Err(InvalidHeaderFormat.into()))
+            } else {
+                Err(InvalidHeaderFormat.into())
+            },
+            None => Err(InvalidHeaderFormat.into()),
+        }
+    }
+
+    #[inline]
+    fn parse_reason_phrase(&mut self) -> Result<&'buffer [u8]> {
+        self.scanner
+            .read_while(|x| is_reason_char(x))
+            .ok_or::<Error>(InvalidHeaderFormat.into())
     }
 
     #[inline]
@@ -252,22 +365,12 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 }
 
-impl<'buffer, 'header> Request<'buffer, 'header> {
-    pub fn parse(
-        buf: &'buffer [u8],
-        headers: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<Request<'buffer, 'header>> {
-        let mut parser = HttpPartParser::new(buf);
-        return parser.parse_request(headers);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use ::*;
 
     #[test]
-    fn http_part_parser_test() {
+    fn http_part_parser_request_test() {
         let mut parser = HttpPartParser::new(b"GET / HTTP/1.1\r\na:b\r\n\r\n");
         let method = parser.parse_method();
         assert_eq!(method.unwrap(), b"GET");
@@ -298,10 +401,55 @@ mod tests {
     }
 
     #[test]
+    fn http_part_parser_response_test() {
+        let mut parser = HttpPartParser::new(b"HTTP/1.1 200 OK\r\na:b\r\n\r\n");
+        let version = parser.parse_http_version();
+        assert_eq!(version.unwrap(), b"1.1");
+
+        assert!(parser.consume_space().is_ok());
+
+        let status = parser.parse_status_code();
+        assert_eq!(status.unwrap(), 200);
+
+        assert!(parser.consume_space().is_ok());
+
+        let reason = parser.parse_reason_phrase();
+        assert_eq!(reason.unwrap(), b"OK");
+
+        assert!(parser.consume_eol().is_ok());
+
+        let name = parser.parse_field_name();
+        assert_eq!(name.unwrap(), b"a");
+
+        assert!(parser.consume_colon().is_ok());
+
+        let value = parser.parse_field_value();
+        assert_eq!(value.unwrap(), b"b");
+
+        assert!(parser.consume_eol().is_ok());
+        assert!(parser.consume_eol().is_ok());
+        assert!(parser.eof());
+    }
+
+    #[test]
     fn empty_request_is_unparsable() {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
         let result = Request::parse(b"", &mut headers);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_ok_response() {
+        let mut headers = Vec::<HeaderField>::with_capacity(10);
+        let result = Response::parse(b"HTTP/1.1 200 OK\r\nname:value\r\n\r\n", &mut headers);
+        assert!(result.is_ok());
+        let req = result.unwrap();
+        assert_eq!(req.version, b"1.1");
+        assert_eq!(req.status, 200);
+        assert_eq!(req.reason, b"OK");
+        assert_eq!(req.headers.len(), 1);
+        assert_eq!(req.headers[0].name, b"name");
+        assert_eq!(req.headers[0].value, b"value");
     }
 
     #[test]
@@ -343,7 +491,7 @@ mod tests {
     }
 
     #[test]
-    fn good() {
+    fn good_request() {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
         assert!(Request::parse(b"GET / HTTP/1.1\r\n\r\n", &mut headers).is_ok());
         assert!(Request::parse(b"GET / HTTP/1.1\n\n", &mut headers).is_ok());
@@ -361,7 +509,7 @@ mod tests {
     }
 
     #[test]
-    fn failures() {
+    fn bad_request() {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
         fail(
             Request::parse(b"G\x01ET / HTTP/1.1\r\n\r\n", &mut headers),
