@@ -240,6 +240,7 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
+    #[cfg(test)]
     fn eof(&mut self) -> bool {
         self.scanner.empty()
     }
@@ -260,7 +261,8 @@ impl<'buffer> HttpPartParser<'buffer> {
 
     #[inline]
     fn parse_http_version(&mut self) -> Result<&'buffer [u8]> {
-        if self.scanner.skip_if(b"HTTP/").is_none() {
+        let http = self.scanner.read(5).ok_or::<Error>(Incomplete.into())?;
+        if http != b"HTTP/" {
             return Err(InvalidHeaderFormat.into());
         }
 
@@ -301,14 +303,14 @@ impl<'buffer> HttpPartParser<'buffer> {
     fn parse_field_name(&mut self) -> Result<&'buffer [u8]> {
         self.scanner
             .read_while(|x| is_tchar(x))
-            .ok_or::<Error>(InvalidHeaderFormat.into())
+            .ok_or::<Error>(Incomplete.into())
     }
 
     #[inline]
     fn parse_field_value(&mut self) -> Result<&'buffer [u8]> {
         self.scanner
             .read_while(|x| is_field_value_char(x))
-            .ok_or(InvalidHeaderFormat.into())
+            .ok_or(Incomplete.into())
     }
 
     #[inline]
@@ -327,6 +329,10 @@ impl<'buffer> HttpPartParser<'buffer> {
 
     #[inline]
     fn consume_eol(&mut self) -> Result<usize> {
+        if self.scanner.empty() {
+            return Err(Incomplete.into());
+        }
+
         if self.scanner.skip_if(b"\r\n").is_some() {
             Ok(2)
         } else if self.scanner.skip_if(b"\n").is_some() {
@@ -336,16 +342,23 @@ impl<'buffer> HttpPartParser<'buffer> {
         }
     }
 
+    #[inline]
+    fn eol(&mut self) -> Option<usize> {
+        if self.scanner.skip_if(b"\r\n").is_some() {
+            Some(2)
+        } else if self.scanner.skip_if(b"\n").is_some() {
+            Some(1)
+        } else {
+            None
+        }
+    }
+
     fn parse_headers<'header>(
         &mut self,
         result: &'header mut Vec<HeaderField<'buffer>>,
     ) -> Result<()> {
         loop {
-            if self.eof() {
-                return Err(Incomplete.into());
-            }
-
-            if self.consume_eol().is_ok() {
+            if self.eol().is_some() {
                 break;
             }
 
@@ -503,49 +516,65 @@ mod tests {
         assert!(Request::parse(b"GET / HTTP/1.1\r\na:b\n\r\n", &mut headers).is_ok());
     }
 
-    fn fail(r: Result<Request>, err: ErrorKind) {
-        assert!(r.is_err());
-        assert_eq!(*r.err().unwrap().kind(), err);
+    macro_rules! fail{
+        ($parse: expr, $err: ident) => {
+            {
+                let r = $parse;
+                assert!(r.is_err());
+                assert_eq!(*r.err().unwrap().kind(), $err);
+            }
+        }
+    }
+
+    macro_rules! invalid_header_request{
+        ($parse: expr) => {
+            fail!($parse, InvalidHeaderFormat)
+        }
+    }
+
+    macro_rules! incomplete{
+        ($parse: expr) => {
+            fail!($parse, Incomplete)
+        }
     }
 
     #[test]
     fn bad_request() {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
-        fail(
-            Request::parse(b"G\x01ET / HTTP/1.1\r\n\r\n", &mut headers),
-            InvalidHeaderFormat,
-        );
-        fail(
-            Request::parse(b"GET /a\x01ef HTTP/1.1\r\n\r\n", &mut headers),
-            InvalidHeaderFormat,
-        );
-        fail(
-            Request::parse(b"GET / HOGE\r\n\r\n", &mut headers),
-            InvalidHeaderFormat,
-        );
-        fail(
-            Request::parse(b"GET / HTTP/11.1\r\n\r\n", &mut headers),
-            InvalidHeaderFormat,
-        );
-        fail(
-            Request::parse(b"GET / HTTP/A.1\r\n\r\n", &mut headers),
-            InvalidHeaderFormat,
-        );
-        fail(
-            Request::parse(b"GET / HTTP/1.A\r\n\r\n", &mut headers),
-            InvalidHeaderFormat,
-        );
-        fail(
-            Request::parse(b"GET / HTTP/1.A\r\n\r\n", &mut headers),
-            InvalidHeaderFormat,
-        );
-        fail(
-            Request::parse(b"GET / HTTP/1.1\r\na\x01b:xyz\r\n\r\n", &mut headers),
-            InvalidHeaderFormat,
-        );
-        fail(
-            Request::parse(b"GET / HTTP/1.1\r\nabc:x\x01z\r\n\r\n", &mut headers),
-            InvalidHeaderFormat,
-        );
+        invalid_header_request!(Request::parse(b"G\x01ET / HTTP/1.1\r\n\r\n", &mut headers));
+        invalid_header_request!(Request::parse(
+            b"GET /a\x01ef HTTP/1.1\r\n\r\n",
+            &mut headers
+        ));
+        invalid_header_request!(Request::parse(b"GET / HOGE\r\n\r\n", &mut headers));
+        invalid_header_request!(Request::parse(b"GET / HTTP/11.1\r\n\r\n", &mut headers));
+        invalid_header_request!(Request::parse(b"GET / HTTP/A.1\r\n\r\n", &mut headers));
+        invalid_header_request!(Request::parse(b"GET / HTTP/1.A\r\n\r\n", &mut headers));
+        invalid_header_request!(Request::parse(b"GET / HTTP/1.A\r\n\r\n", &mut headers));
+        invalid_header_request!(Request::parse(
+            b"GET / HTTP/1.1\r\na\x01b:xyz\r\n\r\n",
+            &mut headers
+        ));
+        invalid_header_request!(Request::parse(
+            b"GET / HTTP/1.1\r\nabc:x\x01z\r\n\r\n",
+            &mut headers
+        ));
     }
+
+    #[test]
+    fn incomplete_request() {
+        let mut headers = Vec::<HeaderField>::with_capacity(10);
+        incomplete!(Request::parse(b"GET", &mut headers));
+        incomplete!(Request::parse(b"GET ", &mut headers));
+        incomplete!(Request::parse(b"GET /", &mut headers));
+        incomplete!(Request::parse(b"GET / ", &mut headers));
+        incomplete!(Request::parse(b"GET / HTT", &mut headers));
+        incomplete!(Request::parse(b"GET / HTTP/1.", &mut headers));
+        incomplete!(Request::parse(b"GET / HTTP/1.1\r\n", &mut headers));
+        incomplete!(Request::parse(b"GET / HTTP/1.1\r\na", &mut headers));
+        incomplete!(Request::parse(b"GET / HTTP/1.1\r\na:", &mut headers));
+        incomplete!(Request::parse(b"GET / HTTP/1.1\r\na:b", &mut headers));
+        incomplete!(Request::parse(b"GET / HTTP/1.1\r\na:b\r\n", &mut headers));
+    }
+
 }
