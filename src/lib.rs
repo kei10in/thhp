@@ -223,6 +223,9 @@ impl<'buffer> HttpPartParser<'buffer> {
         headers: &'header mut Vec<HeaderField<'buffer>>,
     ) -> Result<Response<'buffer, 'header>> {
         let version = self.parse_http_version()?;
+        if self.eof() {
+            return Err(Incomplete.into());
+        }
         self.consume_space()?;
         let status = self.parse_status_code()?;
         self.consume_space()?;
@@ -240,7 +243,6 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    #[cfg(test)]
     fn eof(&mut self) -> bool {
         self.scanner.empty()
     }
@@ -288,7 +290,7 @@ impl<'buffer> HttpPartParser<'buffer> {
             } else {
                 Err(InvalidFormat.into())
             },
-            None => Err(InvalidFormat.into()),
+            None => Err(Incomplete.into()),
         }
     }
 
@@ -296,7 +298,7 @@ impl<'buffer> HttpPartParser<'buffer> {
     fn parse_reason_phrase(&mut self) -> Result<&'buffer [u8]> {
         self.scanner
             .read_while(|x| is_reason_char(x))
-            .ok_or::<Error>(InvalidFormat.into())
+            .ok_or::<Error>(Incomplete.into())
     }
 
     #[inline]
@@ -329,12 +331,14 @@ impl<'buffer> HttpPartParser<'buffer> {
 
     #[inline]
     fn consume_eol(&mut self) -> Result<usize> {
-        if self.scanner.empty() {
-            return Err(Incomplete.into());
-        }
-
-        if self.scanner.skip_if(b"\r\n").is_some() {
-            Ok(2)
+        if self.scanner.skip_if(b"\r").is_some() {
+            if self.eof() {
+                return Err(Incomplete.into());
+            } else if self.scanner.skip_if(b"\n").is_some() {
+                return Ok(2);
+            } else {
+                return Err(InvalidFormat.into());
+            }
         } else if self.scanner.skip_if(b"\n").is_some() {
             Ok(1)
         } else {
@@ -343,11 +347,17 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn eol(&mut self) -> Option<usize> {
-        if self.scanner.skip_if(b"\r\n").is_some() {
-            Some(2)
+    fn eol(&mut self) -> Option<Result<usize>> {
+        if self.scanner.skip_if(b"\r").is_some() {
+            if self.eof() {
+                return Some(Err(Incomplete.into()));
+            } else if self.scanner.skip_if(b"\n").is_some() {
+                return Some(Ok(2));
+            } else {
+                return Some(Err(InvalidFormat.into()));
+            }
         } else if self.scanner.skip_if(b"\n").is_some() {
-            Some(1)
+            Some(Ok(1))
         } else {
             None
         }
@@ -358,8 +368,8 @@ impl<'buffer> HttpPartParser<'buffer> {
         result: &'header mut Vec<HeaderField<'buffer>>,
     ) -> Result<()> {
         loop {
-            if self.eol().is_some() {
-                break;
+            if let Some(r) = self.eol() {
+                return r.map(|_| ());
             }
 
             let name = self.parse_field_name()?;
@@ -373,8 +383,6 @@ impl<'buffer> HttpPartParser<'buffer> {
 
             self.consume_eol()?;
         }
-
-        return Ok(());
     }
 }
 
