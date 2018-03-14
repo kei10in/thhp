@@ -9,6 +9,46 @@ mod scanner;
 pub use errors::*;
 use scanner::Scanner;
 
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Status<T> {
+    Complete(T),
+    Incomplete,
+}
+
+impl<T> Status<T> {
+    pub fn unwrap(self) -> T {
+        match self {
+            Complete(val) => val,
+            Incomplete => panic!("called `Status::unwrap()` on a `Incomplete` value"),
+        }
+    }
+
+    pub fn is_complete(&self) -> bool {
+        match *self {
+            Complete(_) => true,
+            Incomplete => false,
+        }
+    }
+
+    pub fn is_incomplete(&self) -> bool {
+        match *self {
+            Complete(_) => false,
+            Incomplete => true,
+        }
+    }
+}
+
+macro_rules! complete {
+    ($expr:expr) => (match $expr {
+        $crate::Status::Complete(val) => val,
+        $crate::Status::Incomplete => {
+            return Ok($crate::Status::Incomplete)
+        }
+    })
+}
+
+pub use Status::*;
+
 pub struct Request<'buffer, 'header>
 where
     'buffer: 'header,
@@ -23,7 +63,7 @@ impl<'buffer, 'header> Request<'buffer, 'header> {
     pub fn parse(
         buf: &'buffer [u8],
         headers: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<Request<'buffer, 'header>> {
+    ) -> Result<Status<Request<'buffer, 'header>>> {
         let mut parser = HttpPartParser::new(buf);
         return parser.parse_request(headers);
     }
@@ -43,7 +83,7 @@ impl<'buffer, 'header> Response<'buffer, 'header> {
     pub fn parse(
         buf: &'buffer [u8],
         headers: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<Response<'buffer, 'header>> {
+    ) -> Result<Status<Response<'buffer, 'header>>> {
         let mut parser = HttpPartParser::new(buf);
         return parser.parse_response(headers);
     }
@@ -199,47 +239,47 @@ impl<'buffer> HttpPartParser<'buffer> {
     fn parse_request<'header>(
         &mut self,
         headers: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<Request<'buffer, 'header>> {
-        let method = self.parse_method()?;
+    ) -> Result<Status<Request<'buffer, 'header>>> {
+        let method = complete!(self.parse_method()?);
         self.consume_space()?;
-        let target = self.parse_target()?;
+        let target = complete!(self.parse_target()?);
         self.consume_space()?;
-        let version = self.parse_http_version()?;
-        self.consume_eol()?;
+        let version = complete!(self.parse_http_version()?);
+        complete!(self.consume_eol()?);
 
-        self.parse_headers(headers)?;
+        complete!(self.parse_headers(headers)?);
 
-        return Ok(Request::<'buffer, 'header> {
+        return Ok(Complete(Request::<'buffer, 'header> {
             method: method,
             target: target,
             version: version,
             headers: headers,
-        });
+        }));
     }
 
     #[inline]
     fn parse_response<'header>(
         &mut self,
         headers: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<Response<'buffer, 'header>> {
-        let version = self.parse_http_version()?;
+    ) -> Result<Status<Response<'buffer, 'header>>> {
+        let version = complete!(self.parse_http_version()?);
         if self.eof() {
-            return Err(Incomplete.into());
+            return Ok(Incomplete);
         }
         self.consume_space()?;
-        let status = self.parse_status_code()?;
+        let status = complete!(self.parse_status_code()?);
         self.consume_space()?;
-        let reason = self.parse_reason_phrase()?;
-        self.consume_eol()?;
+        let reason = complete!(self.parse_reason_phrase()?);
+        complete!(self.consume_eol()?);
 
-        self.parse_headers(headers)?;
+        complete!(self.parse_headers(headers)?);
 
-        return Ok(Response::<'buffer, 'header> {
+        return Ok(Complete(Response::<'buffer, 'header> {
             version: version,
             status: status,
             reason: reason,
             headers: headers,
-        });
+        }));
     }
 
     #[inline]
@@ -248,71 +288,80 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn parse_method(&mut self) -> Result<&'buffer [u8]> {
-        self.scanner
-            .read_while(|x| is_tchar(x))
-            .ok_or::<Error>(Incomplete.into())
+    fn parse_method(&mut self) -> Result<Status<&'buffer [u8]>> {
+        match self.scanner.read_while(|x| is_tchar(x)) {
+            Some(v) => Ok(Complete(v)),
+            None => Ok(Incomplete),
+        }
     }
 
     #[inline]
-    fn parse_target(&mut self) -> Result<&'buffer [u8]> {
-        self.scanner
-            .read_while(|x| is_vchar(x))
-            .ok_or::<Error>(Incomplete.into())
+    fn parse_target(&mut self) -> Result<Status<&'buffer [u8]>> {
+        match self.scanner.read_while(|x| is_vchar(x)) {
+            Some(v) => Ok(Complete(v)),
+            None => Ok(Incomplete),
+        }
     }
 
     #[inline]
-    fn parse_http_version(&mut self) -> Result<&'buffer [u8]> {
-        let http = self.scanner.read(5).ok_or::<Error>(Incomplete.into())?;
-        if http != b"HTTP/" {
-            return Err(InvalidFormat.into());
+    fn parse_http_version(&mut self) -> Result<Status<&'buffer [u8]>> {
+        if let Some(http) = self.scanner.read(5) {
+            if http != b"HTTP/" {
+                return Err(InvalidFormat.into());
+            }
+        } else {
+            return Ok(Incomplete);
         }
 
         match self.scanner.read(3) {
             Some(v) => {
                 if v.starts_with(b"1.") && is_digit(unsafe { *v.get_unchecked(2) }) {
-                    Ok(v)
+                    Ok(Complete(v))
                 } else {
                     Err(InvalidFormat.into())
                 }
             }
-            None => Err(Incomplete.into()),
+            None => Ok(Incomplete),
         }
     }
 
     #[inline]
-    fn parse_status_code(&mut self) -> Result<u16> {
+    fn parse_status_code(&mut self) -> Result<Status<u16>> {
         match self.scanner.read_while(|x| is_digit(x)) {
             Some(v) => if v.len() == 3 {
                 unsafe { str::from_utf8_unchecked(v) }
                     .parse::<u16>()
+                    .map(|x| Complete(x))
                     .or(Err(InvalidFormat.into()))
             } else {
                 Err(InvalidFormat.into())
             },
-            None => Err(Incomplete.into()),
+            None => Ok(Incomplete),
         }
     }
 
     #[inline]
-    fn parse_reason_phrase(&mut self) -> Result<&'buffer [u8]> {
-        self.scanner
-            .read_while(|x| is_reason_char(x))
-            .ok_or::<Error>(Incomplete.into())
+    fn parse_reason_phrase(&mut self) -> Result<Status<&'buffer [u8]>> {
+        match self.scanner.read_while(|x| is_reason_char(x)) {
+            Some(v) => Ok(Complete(v)),
+            None => Ok(Incomplete),
+        }
     }
 
     #[inline]
-    fn parse_field_name(&mut self) -> Result<&'buffer [u8]> {
-        self.scanner
-            .read_while(|x| is_tchar(x))
-            .ok_or::<Error>(Incomplete.into())
+    fn parse_field_name(&mut self) -> Result<Status<&'buffer [u8]>> {
+        match self.scanner.read_while(|x| is_tchar(x)) {
+            Some(v) => Ok(Complete(v)),
+            None => Ok(Incomplete),
+        }
     }
 
     #[inline]
-    fn parse_field_value(&mut self) -> Result<&'buffer [u8]> {
-        self.scanner
-            .read_while(|x| is_field_value_char(x))
-            .ok_or(Incomplete.into())
+    fn parse_field_value(&mut self) -> Result<Status<&'buffer [u8]>> {
+        match self.scanner.read_while(|x| is_field_value_char(x)) {
+            Some(v) => Ok(Complete(v)),
+            None => Ok(Incomplete),
+        }
     }
 
     #[inline]
@@ -330,34 +379,38 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn consume_eol(&mut self) -> Result<usize> {
+    fn consume_eol(&mut self) -> Result<Status<usize>> {
+        if self.eof() {
+            return Ok(Incomplete);
+        }
+
         if self.scanner.skip_if(b"\r").is_some() {
             if self.eof() {
-                return Err(Incomplete.into());
+                return Ok(Incomplete);
             } else if self.scanner.skip_if(b"\n").is_some() {
-                return Ok(2);
+                return Ok(Complete(2));
             } else {
                 return Err(InvalidFormat.into());
             }
         } else if self.scanner.skip_if(b"\n").is_some() {
-            Ok(1)
+            Ok(Complete(1))
         } else {
             Err(InvalidFormat.into())
         }
     }
 
     #[inline]
-    fn eol(&mut self) -> Option<Result<usize>> {
+    fn eol(&mut self) -> Option<Result<Status<usize>>> {
         if self.scanner.skip_if(b"\r").is_some() {
             if self.eof() {
-                return Some(Err(Incomplete.into()));
+                return Some(Ok(Incomplete));
             } else if self.scanner.skip_if(b"\n").is_some() {
-                return Some(Ok(2));
+                return Some(Ok(Complete(2)));
             } else {
                 return Some(Err(InvalidFormat.into()));
             }
         } else if self.scanner.skip_if(b"\n").is_some() {
-            Some(Ok(1))
+            Some(Ok(Complete(1)))
         } else {
             None
         }
@@ -366,15 +419,18 @@ impl<'buffer> HttpPartParser<'buffer> {
     fn parse_headers<'header>(
         &mut self,
         result: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<()> {
+    ) -> Result<Status<()>> {
         loop {
             if let Some(r) = self.eol() {
-                return r.map(|_| ());
+                return r.map(|x| match x {
+                    Complete(_) => Complete(()),
+                    Incomplete => Incomplete,
+                });
             }
 
-            let name = self.parse_field_name()?;
+            let name = complete!(self.parse_field_name()?);
             self.consume_colon()?;
-            let value = self.parse_field_value()?;
+            let value = complete!(self.parse_field_value()?);
 
             result.push(HeaderField::<'buffer> {
                 name: name,
@@ -394,27 +450,27 @@ mod tests {
     fn http_part_parser_request_test() {
         let mut parser = HttpPartParser::new(b"GET / HTTP/1.1\r\na:b\r\n\r\n");
         let method = parser.parse_method();
-        assert_eq!(method.unwrap(), b"GET");
+        assert_eq!(method.unwrap(), Complete(b"GET".as_ref()));
 
         assert!(parser.consume_space().is_ok());
 
         let target = parser.parse_target();
-        assert_eq!(target.unwrap(), b"/");
+        assert_eq!(target.unwrap(), Complete(b"/".as_ref()));
 
         assert!(parser.consume_space().is_ok());
 
         let version = parser.parse_http_version();
-        assert_eq!(version.unwrap(), b"1.1");
+        assert_eq!(version.unwrap(), Complete(b"1.1".as_ref()));
 
         assert!(parser.consume_eol().is_ok());
 
         let name = parser.parse_field_name();
-        assert_eq!(name.unwrap(), b"a");
+        assert_eq!(name.unwrap(), Complete(b"a".as_ref()));
 
         assert!(parser.consume_colon().is_ok());
 
         let value = parser.parse_field_value();
-        assert_eq!(value.unwrap(), b"b");
+        assert_eq!(value.unwrap(), Complete(b"b".as_ref()));
 
         assert!(parser.consume_eol().is_ok());
         assert!(parser.consume_eol().is_ok());
@@ -425,27 +481,27 @@ mod tests {
     fn http_part_parser_response_test() {
         let mut parser = HttpPartParser::new(b"HTTP/1.1 200 OK\r\na:b\r\n\r\n");
         let version = parser.parse_http_version();
-        assert_eq!(version.unwrap(), b"1.1");
+        assert_eq!(version.unwrap(), Complete(b"1.1".as_ref()));
 
         assert!(parser.consume_space().is_ok());
 
         let status = parser.parse_status_code();
-        assert_eq!(status.unwrap(), 200);
+        assert_eq!(status.unwrap(), Complete(200));
 
         assert!(parser.consume_space().is_ok());
 
         let reason = parser.parse_reason_phrase();
-        assert_eq!(reason.unwrap(), b"OK");
+        assert_eq!(reason.unwrap(), Complete(b"OK".as_ref()));
 
         assert!(parser.consume_eol().is_ok());
 
         let name = parser.parse_field_name();
-        assert_eq!(name.unwrap(), b"a");
+        assert_eq!(name.unwrap(), Complete(b"a".as_ref()));
 
         assert!(parser.consume_colon().is_ok());
 
         let value = parser.parse_field_value();
-        assert_eq!(value.unwrap(), b"b");
+        assert_eq!(value.unwrap(), Complete(b"b".as_ref()));
 
         assert!(parser.consume_eol().is_ok());
         assert!(parser.consume_eol().is_ok());
@@ -453,18 +509,11 @@ mod tests {
     }
 
     #[test]
-    fn empty_request_is_unparsable() {
-        let mut headers = Vec::<HeaderField>::with_capacity(10);
-        let result = Request::parse(b"", &mut headers);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn parse_ok_response() {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
         let result = Response::parse(b"HTTP/1.1 200 OK\r\nname:value\r\n\r\n", &mut headers);
         assert!(result.is_ok());
-        let req = result.unwrap();
+        let req = result.unwrap().unwrap();
         assert_eq!(req.version, b"1.1");
         assert_eq!(req.status, 200);
         assert_eq!(req.reason, b"OK");
@@ -478,7 +527,7 @@ mod tests {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
         let result = Request::parse(b"GET / HTTP/1.1\r\nname:value\r\n\r\n", &mut headers);
         assert!(result.is_ok());
-        let req = result.unwrap();
+        let req = result.unwrap().unwrap();
         assert_eq!(req.method, b"GET");
         assert_eq!(req.target, b"/");
         assert_eq!(req.version, b"1.1");

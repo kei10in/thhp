@@ -34,8 +34,13 @@ mod request {
     }
 
     macro_rules! incomplete {
-        ($parse: expr) => {
-            fail!($parse, Incomplete)
+        ($buf: expr) => {
+            {
+                let mut headers = Vec::<HeaderField>::with_capacity(10);
+                let r = Request::parse($buf, &mut headers);
+                assert!(r.is_ok());
+                assert!(r.unwrap().is_incomplete());
+            }
         }
     }
 
@@ -68,17 +73,22 @@ mod request {
 
     #[test]
     fn incomplete_request() {
+        incomplete!(b"");
         incomplete!(b"GET");
         incomplete!(b"GET ");
         incomplete!(b"GET /");
         incomplete!(b"GET / ");
         incomplete!(b"GET / HTT");
         incomplete!(b"GET / HTTP/1.");
+        incomplete!(b"GET / HTTP/1.1");
+        incomplete!(b"GET / HTTP/1.1\r");
         incomplete!(b"GET / HTTP/1.1\r\n");
         incomplete!(b"GET / HTTP/1.1\r\na");
         incomplete!(b"GET / HTTP/1.1\r\na:");
         incomplete!(b"GET / HTTP/1.1\r\na:b");
+        incomplete!(b"GET / HTTP/1.1\r\na:b\r");
         incomplete!(b"GET / HTTP/1.1\r\na:b\r\n");
+        incomplete!(b"GET / HTTP/1.1\r\na:b\r\n\r");
     }
 }
 
@@ -114,8 +124,13 @@ mod response {
     }
 
     macro_rules! incomplete {
-        ($parse: expr) => {
-            fail!($parse, Incomplete)
+        ($buf: expr) => {
+            {
+                let mut headers = Vec::<HeaderField>::with_capacity(10);
+                let r = Response::parse($buf, &mut headers);
+                assert!(r.is_ok());
+                assert!(r.unwrap().is_incomplete());
+            }
         }
     }
 
@@ -148,6 +163,7 @@ mod response {
 
     #[test]
     fn incomplete_request() {
+        incomplete!(b"");
         incomplete!(b"HTT");
         incomplete!(b"HTTP/");
         incomplete!(b"HTTP/1");
