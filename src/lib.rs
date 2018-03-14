@@ -241,11 +241,11 @@ impl<'buffer> HttpPartParser<'buffer> {
         headers: &'header mut Vec<HeaderField<'buffer>>,
     ) -> Result<Status<Request<'buffer, 'header>>> {
         let method = complete!(self.parse_method()?);
-        self.consume_space()?;
+        self.consume_space().ok_or(InvalidMethod)?;
         let target = complete!(self.parse_target()?);
-        self.consume_space()?;
+        self.consume_space().ok_or(InvalidPath)?;
         let version = complete!(self.parse_http_version()?);
-        complete!(self.consume_eol()?);
+        complete!(self.consume_eol().unwrap_or(Err(InvalidVersion.into()))?);
 
         complete!(self.parse_headers(headers)?);
 
@@ -266,11 +266,12 @@ impl<'buffer> HttpPartParser<'buffer> {
         if self.eof() {
             return Ok(Incomplete);
         }
-        self.consume_space()?;
+        self.consume_space().ok_or(InvalidVersion)?;
         let status = complete!(self.parse_status_code()?);
-        self.consume_space()?;
+        self.consume_space().ok_or(InvalidStatusCode)?;
         let reason = complete!(self.parse_reason_phrase()?);
-        complete!(self.consume_eol()?);
+        complete!(self.consume_eol()
+            .unwrap_or(Err(InvalidReasonPhrase.into()))?);
 
         complete!(self.parse_headers(headers)?);
 
@@ -307,7 +308,7 @@ impl<'buffer> HttpPartParser<'buffer> {
     fn parse_http_version(&mut self) -> Result<Status<&'buffer [u8]>> {
         if let Some(http) = self.scanner.read(5) {
             if http != b"HTTP/" {
-                return Err(InvalidFormat.into());
+                return Err(InvalidVersion.into());
             }
         } else {
             return Ok(Incomplete);
@@ -318,7 +319,7 @@ impl<'buffer> HttpPartParser<'buffer> {
                 if v.starts_with(b"1.") && is_digit(unsafe { *v.get_unchecked(2) }) {
                     Ok(Complete(v))
                 } else {
-                    Err(InvalidFormat.into())
+                    Err(InvalidVersion.into())
                 }
             }
             None => Ok(Incomplete),
@@ -332,9 +333,9 @@ impl<'buffer> HttpPartParser<'buffer> {
                 unsafe { str::from_utf8_unchecked(v) }
                     .parse::<u16>()
                     .map(|x| Complete(x))
-                    .or(Err(InvalidFormat.into()))
+                    .or(Err(InvalidStatusCode.into()))
             } else {
-                Err(InvalidFormat.into())
+                Err(InvalidStatusCode.into())
             },
             None => Ok(Incomplete),
         }
@@ -365,37 +366,33 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn consume_space(&mut self) -> Result<usize> {
-        self.scanner
-            .skip_if(b" ")
-            .ok_or::<Error>(InvalidFormat.into())
+    fn consume_space(&mut self) -> Option<usize> {
+        self.scanner.skip_if(b" ")
     }
 
     #[inline]
-    fn consume_colon(&mut self) -> Result<usize> {
-        self.scanner
-            .skip_if(b":")
-            .ok_or::<Error>(InvalidFormat.into())
+    fn consume_colon(&mut self) -> Option<usize> {
+        self.scanner.skip_if(b":")
     }
 
     #[inline]
-    fn consume_eol(&mut self) -> Result<Status<usize>> {
+    fn consume_eol(&mut self) -> Option<Result<Status<usize>>> {
         if self.eof() {
-            return Ok(Incomplete);
+            return Some(Ok(Incomplete));
         }
 
         if self.scanner.skip_if(b"\r").is_some() {
             if self.eof() {
-                return Ok(Incomplete);
+                return Some(Ok(Incomplete));
             } else if self.scanner.skip_if(b"\n").is_some() {
-                return Ok(Complete(2));
+                return Some(Ok(Complete(2)));
             } else {
-                return Err(InvalidFormat.into());
+                return Some(Err(InvalidNewLine.into()));
             }
         } else if self.scanner.skip_if(b"\n").is_some() {
-            Ok(Complete(1))
+            return Some(Ok(Complete(1)));
         } else {
-            Err(InvalidFormat.into())
+            return None;
         }
     }
 
@@ -407,7 +404,7 @@ impl<'buffer> HttpPartParser<'buffer> {
             } else if self.scanner.skip_if(b"\n").is_some() {
                 return Some(Ok(Complete(2)));
             } else {
-                return Some(Err(InvalidFormat.into()));
+                return Some(Err(InvalidNewLine.into()));
             }
         } else if self.scanner.skip_if(b"\n").is_some() {
             Some(Ok(Complete(1)))
@@ -429,15 +426,15 @@ impl<'buffer> HttpPartParser<'buffer> {
             }
 
             let name = complete!(self.parse_field_name()?);
-            self.consume_colon()?;
+            self.consume_colon().ok_or(InvalidFieldName)?;
             let value = complete!(self.parse_field_value()?);
+
+            complete!(self.consume_eol().unwrap_or(Err(InvalidFieldValue.into()))?);
 
             result.push(HeaderField::<'buffer> {
                 name: name,
                 value: value,
             });
-
-            self.consume_eol()?;
         }
     }
 }
@@ -452,28 +449,28 @@ mod tests {
         let method = parser.parse_method();
         assert_eq!(method.unwrap(), Complete(b"GET".as_ref()));
 
-        assert!(parser.consume_space().is_ok());
+        assert!(parser.consume_space().is_some());
 
         let target = parser.parse_target();
         assert_eq!(target.unwrap(), Complete(b"/".as_ref()));
 
-        assert!(parser.consume_space().is_ok());
+        assert!(parser.consume_space().is_some());
 
         let version = parser.parse_http_version();
         assert_eq!(version.unwrap(), Complete(b"1.1".as_ref()));
 
-        assert!(parser.consume_eol().is_ok());
+        assert!(parser.consume_eol().is_some());
 
         let name = parser.parse_field_name();
         assert_eq!(name.unwrap(), Complete(b"a".as_ref()));
 
-        assert!(parser.consume_colon().is_ok());
+        assert!(parser.consume_colon().is_some());
 
         let value = parser.parse_field_value();
         assert_eq!(value.unwrap(), Complete(b"b".as_ref()));
 
-        assert!(parser.consume_eol().is_ok());
-        assert!(parser.consume_eol().is_ok());
+        assert!(parser.consume_eol().is_some());
+        assert!(parser.consume_eol().is_some());
         assert!(parser.eof());
     }
 
@@ -483,28 +480,28 @@ mod tests {
         let version = parser.parse_http_version();
         assert_eq!(version.unwrap(), Complete(b"1.1".as_ref()));
 
-        assert!(parser.consume_space().is_ok());
+        assert!(parser.consume_space().is_some());
 
         let status = parser.parse_status_code();
         assert_eq!(status.unwrap(), Complete(200));
 
-        assert!(parser.consume_space().is_ok());
+        assert!(parser.consume_space().is_some());
 
         let reason = parser.parse_reason_phrase();
         assert_eq!(reason.unwrap(), Complete(b"OK".as_ref()));
 
-        assert!(parser.consume_eol().is_ok());
+        assert!(parser.consume_eol().is_some());
 
         let name = parser.parse_field_name();
         assert_eq!(name.unwrap(), Complete(b"a".as_ref()));
 
-        assert!(parser.consume_colon().is_ok());
+        assert!(parser.consume_colon().is_some());
 
         let value = parser.parse_field_value();
         assert_eq!(value.unwrap(), Complete(b"b".as_ref()));
 
-        assert!(parser.consume_eol().is_ok());
-        assert!(parser.consume_eol().is_ok());
+        assert!(parser.consume_eol().is_some());
+        assert!(parser.consume_eol().is_some());
         assert!(parser.eof());
     }
 

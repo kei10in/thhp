@@ -1,6 +1,13 @@
 error_chain! {
     errors {
-        InvalidFormat
+        InvalidFieldName
+        InvalidFieldValue
+        InvalidNewLine
+        InvalidVersion
+        InvalidMethod
+        InvalidPath
+        InvalidStatusCode
+        InvalidReasonPhrase
     }
 }
 
@@ -9,7 +16,14 @@ pub use ErrorKind::*;
 impl PartialEq<ErrorKind> for ErrorKind {
     fn eq(&self, other: &ErrorKind) -> bool {
         match (self, other) {
-            (&InvalidFormat, &InvalidFormat) => true,
+            (&InvalidFieldName, &InvalidFieldName) => true,
+            (&InvalidFieldValue, &InvalidFieldValue) => true,
+            (&InvalidNewLine, &InvalidNewLine) => true,
+            (&InvalidVersion, &InvalidVersion) => true,
+            (&InvalidMethod, &InvalidMethod) => true,
+            (&InvalidPath, &InvalidPath) => true,
+            (&InvalidStatusCode, &InvalidStatusCode) => true,
+            (&InvalidReasonPhrase, &InvalidReasonPhrase) => true,
             _ => false,
         }
     }

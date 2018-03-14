@@ -27,10 +27,28 @@ mod request {
         }
     }
 
-    macro_rules! invalid_format {
-        ($parse: expr) => {
-            fail!($parse, InvalidFormat)
-        }
+    macro_rules! invalid_method {
+        ($parse: expr) => { fail!($parse, InvalidMethod) }
+    }
+
+    macro_rules! invalid_path {
+        ($parse: expr) => { fail!($parse, InvalidPath) }
+    }
+
+    macro_rules! invalid_version {
+        ($parse: expr) => { fail!($parse, InvalidVersion) }
+    }
+
+    macro_rules! invalid_field_name {
+        ($parse: expr) => { fail!($parse, InvalidFieldName) }
+    }
+
+    macro_rules! invalid_field_value {
+        ($parse: expr) => { fail!($parse, InvalidFieldValue) }
+    }
+
+    macro_rules! invalid_new_line {
+        ($parse: expr) => { fail!($parse, InvalidNewLine) }
     }
 
     macro_rules! incomplete {
@@ -58,17 +76,17 @@ mod request {
 
     #[test]
     fn bad_request() {
-        invalid_format!(b"G\x01ET / HTTP/1.1\r\n\r\n");
-        invalid_format!(b"GET /a\x01ef HTTP/1.1\r\n\r\n");
-        invalid_format!(b"GET / HOGE\r\n\r\n");
-        invalid_format!(b"GET / HTTP/11.1\r\n\r\n");
-        invalid_format!(b"GET / HTTP/A.1\r\n\r\n");
-        invalid_format!(b"GET / HTTP/1.A\r\n\r\n");
-        invalid_format!(b"GET / HTTP/1.A\r\n\r\n");
-        invalid_format!(b"GET / HTTP/1.1\r\na\x01b:xyz\r\n\r\n");
-        invalid_format!(b"GET / HTTP/1.1\r\nabc:x\x01z\r\n\r\n");
-        invalid_format!(b"GET / HTTP/1.1\r\nabc:xyz\ra\n\r\n");
-        invalid_format!(b"GET / HTTP/1.1\r\nabc:xyz\r\n\ra\n");
+        invalid_method!(b"G\x01ET / HTTP/1.1\r\n\r\n");
+        invalid_path!(b"GET /a\x01ef HTTP/1.1\r\n\r\n");
+        invalid_version!(b"GET / HOGE\r\n\r\n");
+        invalid_version!(b"GET / HTTP/11.1\r\n\r\n");
+        invalid_version!(b"GET / HTTP/A.1\r\n\r\n");
+        invalid_version!(b"GET / HTTP/1.A\r\n\r\n");
+        invalid_version!(b"GET / HTTP/1.A\r\n\r\n");
+        invalid_field_name!(b"GET / HTTP/1.1\r\na\x01b:xyz\r\n\r\n");
+        invalid_field_value!(b"GET / HTTP/1.1\r\nabc:x\x01z\r\n\r\n");
+        invalid_new_line!(b"GET / HTTP/1.1\r\nabc:xyz\ra\n\r\n");
+        invalid_new_line!(b"GET / HTTP/1.1\r\nabc:xyz\r\n\ra\n");
     }
 
     #[test]
@@ -117,10 +135,16 @@ mod response {
         }
     }
 
-    macro_rules! invalid_format {
-        ($parse: expr) => {
-            fail!($parse, InvalidFormat)
-        }
+    macro_rules! invalid_version {
+        ($parse: expr) => { fail!($parse, InvalidVersion) }
+    }
+
+    macro_rules! invalid_status_code {
+        ($parse: expr) => { fail!($parse, InvalidStatusCode) }
+    }
+
+    macro_rules! invalid_reason_phrase {
+        ($parse: expr) => { fail!($parse, InvalidReasonPhrase) }
     }
 
     macro_rules! incomplete {
@@ -148,17 +172,17 @@ mod response {
 
     #[test]
     fn bad_request() {
-        invalid_format!(b"HOGE/1.1 200 OK\r\n\r\n");
-        invalid_format!(b"HTTP/11.1 200 OK\r\n\r\n");
-        invalid_format!(b"HTTP/A.1 200 OK\r\n\r\n");
-        invalid_format!(b"HTTP/1.A 200 OK\r\n\r\n");
-        invalid_format!(b"HTTP/1.11 200 OK\r\n\r\n");
-        invalid_format!(b"HTTP/1.1 20 OK\r\na:b\r\n\r\n");
-        invalid_format!(b"HTTP/1.1 2000 OK\r\na:b\r\n\r\n");
-        invalid_format!(b"HTTP/1.1 2A00 OK\r\na:b\r\n\r\n");
-        invalid_format!(b"HTTP/1.1 200 O\x01K\r\na:b\r\n\r\n");
-        invalid_format!(b"HTTP/1.1 200 O\x01K\r\na:b\r\n\r\n");
-        invalid_format!(b"HTTP/1.1 200 O\x01K\r\na\x01:b\r\n\r\n");
+        invalid_version!(b"HOGE/1.1 200 OK\r\n\r\n");
+        invalid_version!(b"HTTP/11.1 200 OK\r\n\r\n");
+        invalid_version!(b"HTTP/A.1 200 OK\r\n\r\n");
+        invalid_version!(b"HTTP/1.A 200 OK\r\n\r\n");
+        invalid_version!(b"HTTP/1.11 200 OK\r\n\r\n");
+        invalid_status_code!(b"HTTP/1.1 20 OK\r\na:b\r\n\r\n");
+        invalid_status_code!(b"HTTP/1.1 2000 OK\r\na:b\r\n\r\n");
+        invalid_status_code!(b"HTTP/1.1 2A00 OK\r\na:b\r\n\r\n");
+        invalid_reason_phrase!(b"HTTP/1.1 200 O\x01K\r\na:b\r\n\r\n");
+        invalid_reason_phrase!(b"HTTP/1.1 200 O\x01K\r\na:b\r\n\r\n");
+        invalid_reason_phrase!(b"HTTP/1.1 200 O\x01K\r\na\x01:b\r\n\r\n");
     }
 
     #[test]
