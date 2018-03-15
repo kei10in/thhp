@@ -53,8 +53,8 @@ pub struct Request<'buffer, 'header>
 where
     'buffer: 'header,
 {
-    pub method: &'buffer [u8],
-    pub target: &'buffer [u8],
+    pub method: &'buffer str,
+    pub target: &'buffer str,
     pub version: &'buffer [u8],
     pub headers: &'header Vec<HeaderField<'buffer>>,
 }
@@ -75,7 +75,7 @@ where
 {
     pub version: &'buffer [u8],
     pub status: u16,
-    pub reason: &'buffer [u8],
+    pub reason: &'buffer str,
     pub headers: &'header Vec<HeaderField<'buffer>>,
 }
 
@@ -90,8 +90,8 @@ impl<'buffer, 'header> Response<'buffer, 'header> {
 }
 
 pub struct HeaderField<'buffer> {
-    pub name: &'buffer [u8],
-    pub value: &'buffer [u8],
+    pub name: &'buffer str,
+    pub value: &'buffer str,
 }
 
 macro_rules! make_bool_table {
@@ -289,17 +289,17 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn parse_method(&mut self) -> Result<Status<&'buffer [u8]>> {
+    fn parse_method(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_tchar(x)) {
-            Some(v) => Ok(Complete(v)),
+            Some(v) => Ok(Complete(unsafe { str::from_utf8_unchecked(v) })),
             None => Ok(Incomplete),
         }
     }
 
     #[inline]
-    fn parse_target(&mut self) -> Result<Status<&'buffer [u8]>> {
+    fn parse_target(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_vchar(x)) {
-            Some(v) => Ok(Complete(v)),
+            Some(v) => Ok(Complete(unsafe { str::from_utf8_unchecked(v) })),
             None => Ok(Incomplete),
         }
     }
@@ -342,25 +342,25 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn parse_reason_phrase(&mut self) -> Result<Status<&'buffer [u8]>> {
+    fn parse_reason_phrase(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_reason_char(x)) {
-            Some(v) => Ok(Complete(v)),
+            Some(v) => Ok(Complete(unsafe { str::from_utf8_unchecked(v) })),
             None => Ok(Incomplete),
         }
     }
 
     #[inline]
-    fn parse_field_name(&mut self) -> Result<Status<&'buffer [u8]>> {
+    fn parse_field_name(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_tchar(x)) {
-            Some(v) => Ok(Complete(v)),
+            Some(v) => Ok(Complete(unsafe { str::from_utf8_unchecked(v) })),
             None => Ok(Incomplete),
         }
     }
 
     #[inline]
-    fn parse_field_value(&mut self) -> Result<Status<&'buffer [u8]>> {
+    fn parse_field_value(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_field_value_char(x)) {
-            Some(v) => Ok(Complete(v)),
+            Some(v) => Ok(Complete(unsafe { str::from_utf8_unchecked(v) })),
             None => Ok(Incomplete),
         }
     }
@@ -447,12 +447,12 @@ mod tests {
     fn http_part_parser_request_test() {
         let mut parser = HttpPartParser::new(b"GET / HTTP/1.1\r\na:b\r\n\r\n");
         let method = parser.parse_method();
-        assert_eq!(method.unwrap(), Complete(b"GET".as_ref()));
+        assert_eq!(method.unwrap(), Complete("GET"));
 
         assert!(parser.consume_space().is_some());
 
         let target = parser.parse_target();
-        assert_eq!(target.unwrap(), Complete(b"/".as_ref()));
+        assert_eq!(target.unwrap(), Complete("/"));
 
         assert!(parser.consume_space().is_some());
 
@@ -462,12 +462,12 @@ mod tests {
         assert!(parser.consume_eol().is_some());
 
         let name = parser.parse_field_name();
-        assert_eq!(name.unwrap(), Complete(b"a".as_ref()));
+        assert_eq!(name.unwrap(), Complete("a"));
 
         assert!(parser.consume_colon().is_some());
 
         let value = parser.parse_field_value();
-        assert_eq!(value.unwrap(), Complete(b"b".as_ref()));
+        assert_eq!(value.unwrap(), Complete("b"));
 
         assert!(parser.consume_eol().is_some());
         assert!(parser.consume_eol().is_some());
@@ -488,17 +488,17 @@ mod tests {
         assert!(parser.consume_space().is_some());
 
         let reason = parser.parse_reason_phrase();
-        assert_eq!(reason.unwrap(), Complete(b"OK".as_ref()));
+        assert_eq!(reason.unwrap(), Complete("OK"));
 
         assert!(parser.consume_eol().is_some());
 
         let name = parser.parse_field_name();
-        assert_eq!(name.unwrap(), Complete(b"a".as_ref()));
+        assert_eq!(name.unwrap(), Complete("a"));
 
         assert!(parser.consume_colon().is_some());
 
         let value = parser.parse_field_value();
-        assert_eq!(value.unwrap(), Complete(b"b".as_ref()));
+        assert_eq!(value.unwrap(), Complete("b"));
 
         assert!(parser.consume_eol().is_some());
         assert!(parser.consume_eol().is_some());
@@ -513,10 +513,10 @@ mod tests {
         let req = result.unwrap().unwrap();
         assert_eq!(req.version, b"1.1");
         assert_eq!(req.status, 200);
-        assert_eq!(req.reason, b"OK");
+        assert_eq!(req.reason, "OK");
         assert_eq!(req.headers.len(), 1);
-        assert_eq!(req.headers[0].name, b"name");
-        assert_eq!(req.headers[0].value, b"value");
+        assert_eq!(req.headers[0].name, "name");
+        assert_eq!(req.headers[0].value, "value");
     }
 
     #[test]
@@ -525,12 +525,12 @@ mod tests {
         let result = Request::parse(b"GET / HTTP/1.1\r\nname:value\r\n\r\n", &mut headers);
         assert!(result.is_ok());
         let req = result.unwrap().unwrap();
-        assert_eq!(req.method, b"GET");
-        assert_eq!(req.target, b"/");
+        assert_eq!(req.method, "GET");
+        assert_eq!(req.target, "/");
         assert_eq!(req.version, b"1.1");
         assert_eq!(req.headers.len(), 1);
-        assert_eq!(req.headers[0].name, b"name");
-        assert_eq!(req.headers[0].value, b"value");
+        assert_eq!(req.headers[0].name, "name");
+        assert_eq!(req.headers[0].value, "value");
     }
 
     #[test]
@@ -540,8 +540,8 @@ mod tests {
         let result = parser.parse_headers(&mut headers);
         assert!(result.is_ok());
         assert_eq!(headers.len(), 1);
-        assert_eq!(headers[0].name, b"name");
-        assert_eq!(headers[0].value, b"value");
+        assert_eq!(headers[0].name, "name");
+        assert_eq!(headers[0].value, "value");
     }
 
     #[test]
@@ -551,10 +551,10 @@ mod tests {
         let result = parser.parse_headers(&mut headers);
         assert!(result.is_ok());
         assert_eq!(headers.len(), 2);
-        assert_eq!(headers[0].name, b"name1");
-        assert_eq!(headers[0].value, b"value1");
-        assert_eq!(headers[1].name, b"name2");
-        assert_eq!(headers[1].value, b"value2");
+        assert_eq!(headers[0].name, "name1");
+        assert_eq!(headers[0].value, "value1");
+        assert_eq!(headers[1].name, "name2");
+        assert_eq!(headers[1].value, "value2");
     }
 
 }
