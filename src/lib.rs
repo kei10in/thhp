@@ -55,7 +55,7 @@ where
 {
     pub method: &'buffer str,
     pub target: &'buffer str,
-    pub version: &'buffer [u8],
+    pub minor_version: u8,
     pub headers: &'header Vec<HeaderField<'buffer>>,
 }
 
@@ -73,7 +73,7 @@ pub struct Response<'buffer, 'header>
 where
     'buffer: 'header,
 {
-    pub version: &'buffer [u8],
+    pub minor_version: u8,
     pub status: u16,
     pub reason: &'buffer str,
     pub headers: &'header Vec<HeaderField<'buffer>>,
@@ -146,6 +146,15 @@ fn is_vchar(c: u8) -> bool {
 #[inline]
 fn is_digit(c: u8) -> bool {
     b'0' <= c && c <= b'9'
+}
+
+#[inline]
+fn to_digit(c: u8) -> Option<u8> {
+    if is_digit(c) {
+        Some(c - b'0')
+    } else {
+        None
+    }
 }
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -244,7 +253,7 @@ impl<'buffer> HttpPartParser<'buffer> {
         self.consume_space().ok_or(InvalidMethod)?;
         let target = complete!(self.parse_target()?);
         self.consume_space().ok_or(InvalidPath)?;
-        let version = complete!(self.parse_http_version()?);
+        let minor_version = complete!(self.parse_http_version()?);
         complete!(self.consume_eol().unwrap_or(Err(InvalidVersion.into()))?);
 
         complete!(self.parse_headers(headers)?);
@@ -252,7 +261,7 @@ impl<'buffer> HttpPartParser<'buffer> {
         return Ok(Complete(Request::<'buffer, 'header> {
             method: method,
             target: target,
-            version: version,
+            minor_version: minor_version,
             headers: headers,
         }));
     }
@@ -262,7 +271,7 @@ impl<'buffer> HttpPartParser<'buffer> {
         &mut self,
         headers: &'header mut Vec<HeaderField<'buffer>>,
     ) -> Result<Status<Response<'buffer, 'header>>> {
-        let version = complete!(self.parse_http_version()?);
+        let minor_version = complete!(self.parse_http_version()?);
         if self.eof() {
             return Ok(Incomplete);
         }
@@ -276,7 +285,7 @@ impl<'buffer> HttpPartParser<'buffer> {
         complete!(self.parse_headers(headers)?);
 
         return Ok(Complete(Response::<'buffer, 'header> {
-            version: version,
+            minor_version: minor_version,
             status: status,
             reason: reason,
             headers: headers,
@@ -305,21 +314,21 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn parse_http_version(&mut self) -> Result<Status<&'buffer [u8]>> {
-        if let Some(http) = self.scanner.read(5) {
-            if http != b"HTTP/" {
+    fn parse_http_version(&mut self) -> Result<Status<u8>> {
+        if let Some(http) = self.scanner.read(7) {
+            if http != b"HTTP/1." {
                 return Err(InvalidVersion.into());
             }
         } else {
             return Ok(Incomplete);
         }
 
-        match self.scanner.read(3) {
+        match self.scanner.read(1) {
             Some(v) => {
-                if v.starts_with(b"1.") && is_digit(unsafe { *v.get_unchecked(2) }) {
-                    Ok(Complete(v))
-                } else {
-                    Err(InvalidVersion.into())
+                let c = unsafe { *v.get_unchecked(0) };
+                match to_digit(c) {
+                    Some(v) => Ok(Complete(v)),
+                    None => Err(InvalidVersion.into()),
                 }
             }
             None => Ok(Incomplete),
@@ -457,7 +466,7 @@ mod tests {
         assert!(parser.consume_space().is_some());
 
         let version = parser.parse_http_version();
-        assert_eq!(version.unwrap(), Complete(b"1.1".as_ref()));
+        assert_eq!(version.unwrap(), Complete(1));
 
         assert!(parser.consume_eol().is_some());
 
@@ -478,7 +487,7 @@ mod tests {
     fn http_part_parser_response_test() {
         let mut parser = HttpPartParser::new(b"HTTP/1.1 200 OK\r\na:b\r\n\r\n");
         let version = parser.parse_http_version();
-        assert_eq!(version.unwrap(), Complete(b"1.1".as_ref()));
+        assert_eq!(version.unwrap(), Complete(1));
 
         assert!(parser.consume_space().is_some());
 
@@ -511,7 +520,7 @@ mod tests {
         let result = Response::parse(b"HTTP/1.1 200 OK\r\nname:value\r\n\r\n", &mut headers);
         assert!(result.is_ok());
         let req = result.unwrap().unwrap();
-        assert_eq!(req.version, b"1.1");
+        assert_eq!(req.minor_version, 1);
         assert_eq!(req.status, 200);
         assert_eq!(req.reason, "OK");
         assert_eq!(req.headers.len(), 1);
@@ -527,7 +536,7 @@ mod tests {
         let req = result.unwrap().unwrap();
         assert_eq!(req.method, "GET");
         assert_eq!(req.target, "/");
-        assert_eq!(req.version, b"1.1");
+        assert_eq!(req.minor_version, 1);
         assert_eq!(req.headers.len(), 1);
         assert_eq!(req.headers[0].name, "name");
         assert_eq!(req.headers[0].value, "value");
