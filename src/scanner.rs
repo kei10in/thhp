@@ -61,16 +61,54 @@ impl<'a> Scanner<'a> {
     {
         let s = self.index;
         loop {
-            match self.buffer.get(self.index) {
-                Some(c) => {
-                    if !acceptable(*c) {
-                        return Some(unsafe { self.buffer.get_unchecked(s..(self.index)) });
+            if let Some(val) = self.buffer.get(self.index..self.index + 8) {
+                unsafe {
+                    if !acceptable(*val.get_unchecked(0)) {
+                        break;
+                    } else if !acceptable(*val.get_unchecked(1)) {
+                        self.index += 1;
+                        break;
+                    } else if !acceptable(*val.get_unchecked(2)) {
+                        self.index += 2;
+                        break;
+                    } else if !acceptable(*val.get_unchecked(3)) {
+                        self.index += 3;
+                        break;
+                    } else if !acceptable(*val.get_unchecked(4)) {
+                        self.index += 4;
+                        break;
+                    } else if !acceptable(*val.get_unchecked(5)) {
+                        self.index += 5;
+                        break;
+                    } else if !acceptable(*val.get_unchecked(6)) {
+                        self.index += 6;
+                        break;
+                    } else if !acceptable(*val.get_unchecked(7)) {
+                        self.index += 7;
+                        break;
+                    } else {
+                        self.index += 8;
                     }
-                    self.index += 1;
                 }
-                None => return None,
+            } else {
+                loop {
+                    match self.buffer.get(self.index) {
+                        Some(c) => {
+                            if acceptable(*c) {
+                                self.index += 1;
+                            } else {
+                                break;
+                            }
+                        }
+                        None => return None,
+                    }
+                }
+                break;
             }
         }
+
+        debug_assert!(self.index <= self.buffer.len());
+        return Some(unsafe { self.buffer.get_unchecked(s..self.index) });
     }
 }
 
@@ -110,5 +148,23 @@ mod tests {
         let r1 = s.read_while(|x| b'A' <= x && x <= b'Z');
         assert_eq!(r1, Some(b"GET".as_ref()));
         assert_eq!(s.position(), 3);
+    }
+
+    #[test]
+    fn test_read_3_chars_by_read_while() {
+        let mut s = Scanner::new(b"GET / ");
+
+        let r1 = s.read_while(|x| b'A' <= x && x <= b'Z');
+        assert_eq!(r1, Some(b"GET".as_ref()));
+        assert_eq!(s.position(), 3);
+    }
+
+    #[test]
+    fn test_read_10_chars_by_read_while() {
+        let mut s = Scanner::new(b"HELLOWORLD!");
+
+        let r1 = s.read_while(|x| b'A' <= x && x <= b'Z');
+        assert_eq!(r1, Some(b"HELLOWORLD".as_ref()));
+        assert_eq!(s.position(), 10);
     }
 }
