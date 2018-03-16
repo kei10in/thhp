@@ -15,6 +15,8 @@ pub enum Status<T> {
     Incomplete,
 }
 
+pub use Status::*;
+
 impl<T> Status<T> {
     pub fn unwrap(self) -> T {
         match self {
@@ -46,8 +48,6 @@ macro_rules! complete {
         }
     })
 }
-
-pub use Status::*;
 
 pub struct Request<'buffer, 'header>
 where
@@ -315,23 +315,32 @@ impl<'buffer> HttpPartParser<'buffer> {
 
     #[inline]
     fn parse_http_version(&mut self) -> Result<Status<u8>> {
-        if let Some(http) = self.scanner.read(7) {
-            if http != b"HTTP/1." {
-                return Err(InvalidVersion.into());
-            }
-        } else {
-            return Ok(Incomplete);
-        }
-
-        match self.scanner.read(1) {
-            Some(v) => {
-                let c = unsafe { *v.get_unchecked(0) };
-                match to_digit(c) {
-                    Some(v) => Ok(Complete(v)),
-                    None => Err(InvalidVersion.into()),
+        if let Some(http) = self.scanner.read(8) {
+            unsafe {
+                if *http.get_unchecked(0) == b'H' && *http.get_unchecked(1) == b'T'
+                    && *http.get_unchecked(2) == b'T'
+                    && *http.get_unchecked(3) == b'P'
+                    && *http.get_unchecked(4) == b'/'
+                    && *http.get_unchecked(5) == b'1'
+                    && *http.get_unchecked(6) == b'.'
+                {
+                    let c = http.get_unchecked(7);
+                    return match to_digit(*c) {
+                        Some(v) => Ok(Complete(v)),
+                        None => Err(InvalidVersion.into()),
+                    };
+                } else {
+                    return Err(InvalidVersion.into());
                 }
-            }
-            None => Ok(Incomplete),
+            };
+        } else {
+            if self.scanner.empty() {
+                return Ok(Incomplete);
+            } else if self.scanner.is_head_of(b"HTTP/1.") {
+                return Ok(Incomplete);
+            } else {
+                return Err(InvalidVersion.into());
+            };
         }
     }
 

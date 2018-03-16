@@ -29,6 +29,12 @@ impl<'a> Scanner<'a> {
     }
 
     #[inline]
+    pub fn is_head_of(&self, trunk: &[u8]) -> bool {
+        debug_assert!(self.index <= self.buffer.len());
+        return unsafe { trunk.starts_with(self.buffer.get_unchecked(self.index..)) };
+    }
+
+    #[inline]
     pub fn skip_if(&mut self, needle: &[u8]) -> Option<usize> {
         if unsafe { self.buffer.get_unchecked(self.index..) }.starts_with(needle) {
             self.index += needle.len();
