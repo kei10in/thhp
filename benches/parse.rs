@@ -76,6 +76,7 @@ fn bench_httparse(b: &mut test::Bencher) {
 fn bench_httpparse(b: &mut test::Bencher) {
     let mut headers = Vec::<httpparser::HeaderField>::with_capacity(16);
     b.iter(|| {
+        headers.clear();
         let res = httpparser::Request::parse(REQ, &mut headers);
         assert!(res.is_ok());
     });
