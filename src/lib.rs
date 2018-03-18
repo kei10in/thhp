@@ -383,6 +383,37 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
+    fn parse_headers<'header>(
+        &mut self,
+        result: &'header mut Vec<HeaderField<'buffer>>,
+    ) -> Result<Status<(&'header mut Vec<HeaderField<'buffer>>)>> {
+        loop {
+            if let Some(r) = self.eol() {
+                return r.map(|x| match x {
+                    Complete(_) => Complete(result),
+                    Incomplete => Incomplete,
+                });
+            }
+
+            let header = complete!(self.parse_header_field()?);
+            result.push(header);
+        }
+    }
+
+    #[inline]
+    fn parse_header_field(&mut self) -> Result<Status<HeaderField<'buffer>>> {
+        let name = complete!(self.parse_field_name()?);
+        self.consume_colon().ok_or(InvalidFieldName)?;
+        let value = complete!(self.parse_field_value()?);
+        complete!(self.consume_eol().unwrap_or(Err(InvalidFieldValue.into()))?);
+
+        return Ok(Complete(HeaderField::<'buffer> {
+            name: name,
+            value: value,
+        }));
+    }
+
+    #[inline]
     fn parse_field_name(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_tchar(x)) {
             Some(v) => Ok(Complete(unsafe { str::from_utf8_unchecked(v) })),
@@ -443,31 +474,6 @@ impl<'buffer> HttpPartParser<'buffer> {
             Some(Ok(Complete(1)))
         } else {
             None
-        }
-    }
-
-    fn parse_headers<'header>(
-        &mut self,
-        result: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<Status<(&'header mut Vec<HeaderField<'buffer>>)>> {
-        loop {
-            if let Some(r) = self.eol() {
-                return r.map(|x| match x {
-                    Complete(_) => Complete(result),
-                    Incomplete => Incomplete,
-                });
-            }
-
-            let name = complete!(self.parse_field_name()?);
-            self.consume_colon().ok_or(InvalidFieldName)?;
-            let value = complete!(self.parse_field_value()?);
-
-            complete!(self.consume_eol().unwrap_or(Err(InvalidFieldValue.into()))?);
-
-            result.push(HeaderField::<'buffer> {
-                name: name,
-                value: value,
-            });
         }
     }
 }
