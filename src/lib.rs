@@ -249,21 +249,12 @@ impl<'buffer> HttpPartParser<'buffer> {
         &mut self,
         headers: &'header mut Vec<HeaderField<'buffer>>,
     ) -> Result<Status<Request<'buffer, 'header>>> {
-        let method = complete!(self.parse_method()?);
-        self.consume_space().ok_or(InvalidMethod)?;
-        let target = complete!(self.parse_target()?);
-        self.consume_space().ok_or(InvalidPath)?;
-        let minor_version = complete!(self.parse_http_version()?);
-        complete!(self.consume_eol().unwrap_or(Err(InvalidVersion.into()))?);
-
-        complete!(self.parse_headers(headers)?);
-
-        return Ok(Complete(Request::<'buffer, 'header> {
-            method: method,
-            target: target,
-            minor_version: minor_version,
-            headers: headers,
-        }));
+        Ok(Complete(Request::<'buffer, 'header> {
+            method: complete!(self.parse_request_method()?),
+            target: complete!(self.parse_request_target()?),
+            minor_version: complete!(self.parse_request_http_version()?),
+            headers: complete!(self.parse_headers(headers)?),
+        }))
     }
 
     #[inline]
@@ -271,25 +262,12 @@ impl<'buffer> HttpPartParser<'buffer> {
         &mut self,
         headers: &'header mut Vec<HeaderField<'buffer>>,
     ) -> Result<Status<Response<'buffer, 'header>>> {
-        let minor_version = complete!(self.parse_http_version()?);
-        if self.eof() {
-            return Ok(Incomplete);
-        }
-        self.consume_space().ok_or(InvalidVersion)?;
-        let status = complete!(self.parse_status_code()?);
-        self.consume_space().ok_or(InvalidStatusCode)?;
-        let reason = complete!(self.parse_reason_phrase()?);
-        complete!(self.consume_eol()
-            .unwrap_or(Err(InvalidReasonPhrase.into()))?);
-
-        complete!(self.parse_headers(headers)?);
-
-        return Ok(Complete(Response::<'buffer, 'header> {
-            minor_version: minor_version,
-            status: status,
-            reason: reason,
-            headers: headers,
-        }));
+        Ok(Complete(Response::<'buffer, 'header> {
+            minor_version: complete!(self.parse_response_http_version()?),
+            status: complete!(self.parse_response_status_code()?),
+            reason: complete!(self.parse_response_reason_phrase()?),
+            headers: complete!(self.parse_headers(headers)?),
+        }))
     }
 
     #[inline]
@@ -298,17 +276,77 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn parse_method(&mut self) -> Result<Status<&'buffer str>> {
+    fn parse_request_method(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_tchar(x)) {
-            Some(v) => Ok(Complete(unsafe { str::from_utf8_unchecked(v) })),
+            Some(v) => {
+                self.consume_space().ok_or(InvalidMethod)?;
+                Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
+            }
             None => Ok(Incomplete),
         }
     }
 
     #[inline]
-    fn parse_target(&mut self) -> Result<Status<&'buffer str>> {
+    fn parse_request_target(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_vchar(x)) {
-            Some(v) => Ok(Complete(unsafe { str::from_utf8_unchecked(v) })),
+            Some(v) => {
+                self.consume_space().ok_or(InvalidPath)?;
+                Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
+            }
+            None => Ok(Incomplete),
+        }
+    }
+
+    #[inline]
+    fn parse_request_http_version(&mut self) -> Result<Status<u8>> {
+        match self.parse_http_version() {
+            v @ Ok(Complete(_)) => {
+                self.consume_eol().unwrap_or(Err(InvalidVersion.into()))?;
+                v
+            }
+            v @ _ => v,
+        }
+    }
+
+    #[inline]
+    fn parse_response_http_version(&mut self) -> Result<Status<u8>> {
+        match self.parse_http_version() {
+            v @ Ok(Complete(_)) => {
+                if self.eof() {
+                    Ok(Incomplete)
+                } else {
+                    self.consume_space().ok_or(InvalidVersion)?;
+                    v
+                }
+            }
+            v @ _ => v,
+        }
+    }
+
+    #[inline]
+    fn parse_response_status_code(&mut self) -> Result<Status<u16>> {
+        match self.scanner.read_while(|x| is_digit(x)) {
+            Some(v) => if v.len() == 3 {
+                self.consume_space().ok_or(InvalidStatusCode)?;
+                unsafe { str::from_utf8_unchecked(v) }
+                    .parse::<u16>()
+                    .map(|x| Complete(x))
+                    .or(Err(InvalidStatusCode.into()))
+            } else {
+                Err(InvalidStatusCode.into())
+            },
+            None => Ok(Incomplete),
+        }
+    }
+
+    #[inline]
+    fn parse_response_reason_phrase(&mut self) -> Result<Status<&'buffer str>> {
+        match self.scanner.read_while(|x| is_reason_char(x)) {
+            Some(v) => {
+                self.consume_eol()
+                    .unwrap_or(Err(InvalidReasonPhrase.into()))?;
+                Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
+            }
             None => Ok(Incomplete),
         }
     }
@@ -341,29 +379,6 @@ impl<'buffer> HttpPartParser<'buffer> {
             } else {
                 return Err(InvalidVersion.into());
             };
-        }
-    }
-
-    #[inline]
-    fn parse_status_code(&mut self) -> Result<Status<u16>> {
-        match self.scanner.read_while(|x| is_digit(x)) {
-            Some(v) => if v.len() == 3 {
-                unsafe { str::from_utf8_unchecked(v) }
-                    .parse::<u16>()
-                    .map(|x| Complete(x))
-                    .or(Err(InvalidStatusCode.into()))
-            } else {
-                Err(InvalidStatusCode.into())
-            },
-            None => Ok(Incomplete),
-        }
-    }
-
-    #[inline]
-    fn parse_reason_phrase(&mut self) -> Result<Status<&'buffer str>> {
-        match self.scanner.read_while(|x| is_reason_char(x)) {
-            Some(v) => Ok(Complete(unsafe { str::from_utf8_unchecked(v) })),
-            None => Ok(Incomplete),
         }
     }
 
@@ -434,11 +449,11 @@ impl<'buffer> HttpPartParser<'buffer> {
     fn parse_headers<'header>(
         &mut self,
         result: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<Status<()>> {
+    ) -> Result<Status<(&'header mut Vec<HeaderField<'buffer>>)>> {
         loop {
             if let Some(r) = self.eol() {
                 return r.map(|x| match x {
-                    Complete(_) => Complete(()),
+                    Complete(_) => Complete(result),
                     Incomplete => Incomplete,
                 });
             }
@@ -464,20 +479,14 @@ mod tests {
     #[test]
     fn http_part_parser_request_test() {
         let mut parser = HttpPartParser::new(b"GET / HTTP/1.1\r\na:b\r\n\r\n");
-        let method = parser.parse_method();
+        let method = parser.parse_request_method();
         assert_eq!(method.unwrap(), Complete("GET"));
 
-        assert!(parser.consume_space().is_some());
-
-        let target = parser.parse_target();
+        let target = parser.parse_request_target();
         assert_eq!(target.unwrap(), Complete("/"));
 
-        assert!(parser.consume_space().is_some());
-
-        let version = parser.parse_http_version();
+        let version = parser.parse_request_http_version();
         assert_eq!(version.unwrap(), Complete(1));
-
-        assert!(parser.consume_eol().is_some());
 
         let name = parser.parse_field_name();
         assert_eq!(name.unwrap(), Complete("a"));
@@ -495,20 +504,14 @@ mod tests {
     #[test]
     fn http_part_parser_response_test() {
         let mut parser = HttpPartParser::new(b"HTTP/1.1 200 OK\r\na:b\r\n\r\n");
-        let version = parser.parse_http_version();
+        let version = parser.parse_response_http_version();
         assert_eq!(version.unwrap(), Complete(1));
 
-        assert!(parser.consume_space().is_some());
-
-        let status = parser.parse_status_code();
+        let status = parser.parse_response_status_code();
         assert_eq!(status.unwrap(), Complete(200));
 
-        assert!(parser.consume_space().is_some());
-
-        let reason = parser.parse_reason_phrase();
+        let reason = parser.parse_response_reason_phrase();
         assert_eq!(reason.unwrap(), Complete("OK"));
-
-        assert!(parser.consume_eol().is_some());
 
         let name = parser.parse_field_name();
         assert_eq!(name.unwrap(), Complete("a"));
@@ -555,24 +558,28 @@ mod tests {
     fn parse_a_header_field() {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
         let mut parser = HttpPartParser::new(b"name:value\r\n\r\n");
-        let result = parser.parse_headers(&mut headers);
-        assert!(result.is_ok());
-        assert_eq!(headers.len(), 1);
-        assert_eq!(headers[0].name, "name");
-        assert_eq!(headers[0].value, "value");
+        if let Ok(Complete(ref hs)) = parser.parse_headers(&mut headers) {
+            assert_eq!(hs.len(), 1);
+            assert_eq!(hs[0].name, "name");
+            assert_eq!(hs[0].value, "value");
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn parse_2_header_fields() {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
         let mut parser = HttpPartParser::new(b"name1:value1\r\nname2:value2\r\n\r\n");
-        let result = parser.parse_headers(&mut headers);
-        assert!(result.is_ok());
-        assert_eq!(headers.len(), 2);
-        assert_eq!(headers[0].name, "name1");
-        assert_eq!(headers[0].value, "value1");
-        assert_eq!(headers[1].name, "name2");
-        assert_eq!(headers[1].value, "value2");
+        if let Ok(Complete(ref hs)) = parser.parse_headers(&mut headers) {
+            assert_eq!(hs.len(), 2);
+            assert_eq!(hs[0].name, "name1");
+            assert_eq!(hs[0].value, "value1");
+            assert_eq!(hs[1].name, "name2");
+            assert_eq!(hs[1].value, "value2");
+        } else {
+            assert!(false);
+        }
     }
 
 }
