@@ -402,21 +402,19 @@ impl<'buffer> HttpPartParser<'buffer> {
 
     #[inline]
     fn parse_header_field(&mut self) -> Result<Status<HeaderField<'buffer>>> {
-        let name = complete!(self.parse_field_name()?);
-        self.consume_colon().ok_or(InvalidFieldName)?;
-        let value = complete!(self.parse_field_value()?);
-        complete!(self.consume_eol().unwrap_or(Err(InvalidFieldValue.into()))?);
-
-        return Ok(Complete(HeaderField::<'buffer> {
-            name: name,
-            value: value,
-        }));
+        Ok(Complete(HeaderField::<'buffer> {
+            name: complete!(self.parse_field_name()?),
+            value: complete!(self.parse_field_value()?),
+        }))
     }
 
     #[inline]
     fn parse_field_name(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_tchar(x)) {
-            Some(v) => Ok(Complete(unsafe { str::from_utf8_unchecked(v) })),
+            Some(v) => {
+                self.consume_colon().ok_or(InvalidFieldName)?;
+                Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
+            }
             None => Ok(Incomplete),
         }
     }
@@ -424,7 +422,10 @@ impl<'buffer> HttpPartParser<'buffer> {
     #[inline]
     fn parse_field_value(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_field_value_char(x)) {
-            Some(v) => Ok(Complete(unsafe { str::from_utf8_unchecked(v) })),
+            Some(v) => {
+                self.consume_eol().unwrap_or(Err(InvalidFieldValue.into()))?;
+                Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
+            }
             None => Ok(Incomplete),
         }
     }
@@ -497,12 +498,9 @@ mod tests {
         let name = parser.parse_field_name();
         assert_eq!(name.unwrap(), Complete("a"));
 
-        assert!(parser.consume_colon().is_some());
-
         let value = parser.parse_field_value();
         assert_eq!(value.unwrap(), Complete("b"));
 
-        assert!(parser.consume_eol().is_some());
         assert!(parser.consume_eol().is_some());
         assert!(parser.eof());
     }
@@ -522,12 +520,9 @@ mod tests {
         let name = parser.parse_field_name();
         assert_eq!(name.unwrap(), Complete("a"));
 
-        assert!(parser.consume_colon().is_some());
-
         let value = parser.parse_field_value();
         assert_eq!(value.unwrap(), Complete("b"));
 
-        assert!(parser.consume_eol().is_some());
         assert!(parser.consume_eol().is_some());
         assert!(parser.eof());
     }
