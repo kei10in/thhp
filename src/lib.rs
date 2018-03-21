@@ -412,7 +412,7 @@ impl<'buffer> HttpPartParser<'buffer> {
     fn parse_field_name(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_tchar(x)) {
             Some(v) => {
-                self.consume_colon().ok_or(InvalidFieldName)?;
+                self.consume_name_value_separator().ok_or(InvalidFieldName)?;
                 Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
             }
             None => Ok(Incomplete),
@@ -436,8 +436,23 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
+    fn consume_name_value_separator(&mut self) -> Option<usize> {
+        match self.consume_colon() {
+            Some(c) => Some(c + self.consume_optional_whitespace()),
+            None => None,
+        }
+    }
+
+    #[inline]
     fn consume_colon(&mut self) -> Option<usize> {
         self.scanner.skip_if(b":")
+    }
+
+    #[inline]
+    fn consume_optional_whitespace(&mut self) -> usize {
+        self.scanner
+            .read_while(|x| x == b' ' || x == b'\t')
+            .map_or(0, |x| x.len())
     }
 
     #[inline]
