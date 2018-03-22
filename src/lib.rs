@@ -458,39 +458,45 @@ impl<'buffer> HttpPartParser<'buffer> {
 
     #[inline]
     fn consume_eol(&mut self) -> Option<Result<Status<usize>>> {
-        if self.eof() {
-            return Some(Ok(Incomplete));
-        }
-
-        if self.scanner.skip_if(b"\r").is_some() {
-            if self.eof() {
-                return Some(Ok(Incomplete));
-            } else if self.scanner.skip_if(b"\n").is_some() {
-                return Some(Ok(Complete(2)));
-            } else {
-                return Some(Err(InvalidNewLine.into()));
-            }
-        } else if self.scanner.skip_if(b"\n").is_some() {
-            return Some(Ok(Complete(1)));
-        } else {
-            return None;
+        match self.scanner.skip_if(b"\r") {
+            Some(_) => match self.scanner.skip_if(b"\n") {
+                Some(_) => Some(Ok(Complete(2))),
+                None => if self.eof() {
+                    Some(Ok(Incomplete))
+                } else {
+                    Some(Err(InvalidNewLine.into()))
+                },
+            },
+            None => match self.scanner.skip_if(b"\n") {
+                Some(_) => Some(Ok(Complete(1))),
+                None => if self.eof() {
+                    Some(Ok(Incomplete))
+                } else {
+                    None
+                },
+            },
         }
     }
 
     #[inline]
     fn eol(&mut self) -> Option<Result<Status<usize>>> {
-        if self.scanner.skip_if(b"\r").is_some() {
-            if self.eof() {
-                return Some(Ok(Incomplete));
-            } else if self.scanner.skip_if(b"\n").is_some() {
-                return Some(Ok(Complete(2)));
-            } else {
-                return Some(Err(InvalidNewLine.into()));
-            }
-        } else if self.scanner.skip_if(b"\n").is_some() {
-            Some(Ok(Complete(1)))
-        } else {
-            None
+        match self.scanner.skip_if(b"\r") {
+            Some(_) => match self.scanner.skip_if(b"\n") {
+                Some(_) => Some(Ok(Complete(2))),
+                None => if self.eof() {
+                    Some(Ok(Incomplete))
+                } else {
+                    Some(Err(InvalidNewLine.into()))
+                },
+            },
+            None => match self.scanner.skip_if(b"\n") {
+                Some(_) => Some(Ok(Complete(1))),
+                None => if self.eof() {
+                    Some(Ok(Incomplete))
+                } else {
+                    None
+                },
+            },
         }
     }
 }
