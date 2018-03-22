@@ -228,6 +228,7 @@ const FIELD_VALUE_CHAR_MAP: [bool; 256] = make_bool_table![
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
+#[inline]
 fn is_field_value_char(c: u8) -> bool {
     FIELD_VALUE_CHAR_MAP[c as usize]
 }
