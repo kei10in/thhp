@@ -24,10 +24,10 @@ impl<'a> Scanner<'a> {
     }
 
     #[inline]
-    pub fn skip_if(&mut self, needle: &[u8]) -> Option<usize> {
+    pub fn skip_if(&mut self, needle: &[u8]) -> Option<()> {
         if self.buffer.starts_with(needle) {
             self.buffer = unsafe { self.buffer.get_unchecked(needle.len()..) };
-            Some(needle.len())
+            Some(())
         } else {
             None
         }
@@ -113,7 +113,7 @@ mod tests {
         let mut s = Scanner::new(b"HTTP/1.1");
 
         let r1 = s.skip_if(b"HTTP/");
-        assert_eq!(r1, Some(5));
+        assert_eq!(r1, Some(()));
     }
 
     #[test]

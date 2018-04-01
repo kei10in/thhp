@@ -250,6 +250,7 @@ impl<'buffer> HttpPartParser<'buffer> {
         &mut self,
         headers: &'header mut Vec<HeaderField<'buffer>>,
     ) -> Result<Status<Request<'buffer, 'header>>> {
+        complete!(self.skip_empty_lines()?);
         Ok(Complete(Request::<'buffer, 'header> {
             method: complete!(self.parse_request_method()?),
             target: complete!(self.parse_request_target()?),
@@ -263,6 +264,7 @@ impl<'buffer> HttpPartParser<'buffer> {
         &mut self,
         headers: &'header mut Vec<HeaderField<'buffer>>,
     ) -> Result<Status<Response<'buffer, 'header>>> {
+        complete!(self.skip_empty_lines()?);
         Ok(Complete(Response::<'buffer, 'header> {
             minor_version: complete!(self.parse_response_http_version()?),
             status: complete!(self.parse_response_status_code()?),
@@ -432,20 +434,23 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn consume_space(&mut self) -> Option<usize> {
+    fn consume_space(&mut self) -> Option<()> {
         self.scanner.skip_if(b" ")
     }
 
     #[inline]
-    fn consume_name_value_separator(&mut self) -> Option<usize> {
+    fn consume_name_value_separator(&mut self) -> Option<()> {
         match self.consume_colon() {
-            Some(c) => Some(c + self.consume_optional_whitespace()),
+            Some(_) => {
+                self.consume_optional_whitespace();
+                Some(())
+            }
             None => None,
         }
     }
 
     #[inline]
-    fn consume_colon(&mut self) -> Option<usize> {
+    fn consume_colon(&mut self) -> Option<()> {
         self.scanner.skip_if(b":")
     }
 
@@ -457,10 +462,20 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn consume_eol(&mut self) -> Option<Result<Status<usize>>> {
+    fn skip_empty_lines(&mut self) -> Result<Status<()>> {
+        loop {
+            match self.consume_eol() {
+                Some(v) => complete!(v?),
+                None => return Ok(Complete(())),
+            }
+        }
+    }
+
+    #[inline]
+    fn consume_eol(&mut self) -> Option<Result<Status<()>>> {
         match self.scanner.skip_if(b"\r") {
             Some(_) => match self.scanner.skip_if(b"\n") {
-                Some(_) => Some(Ok(Complete(2))),
+                Some(_) => Some(Ok(Complete(()))),
                 None => if self.eof() {
                     Some(Ok(Incomplete))
                 } else {
@@ -468,7 +483,7 @@ impl<'buffer> HttpPartParser<'buffer> {
                 },
             },
             None => match self.scanner.skip_if(b"\n") {
-                Some(_) => Some(Ok(Complete(1))),
+                Some(_) => Some(Ok(Complete(()))),
                 None => if self.eof() {
                     Some(Ok(Incomplete))
                 } else {
@@ -479,10 +494,10 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn eol(&mut self) -> Option<Result<Status<usize>>> {
+    fn eol(&mut self) -> Option<Result<Status<()>>> {
         match self.scanner.skip_if(b"\r") {
             Some(_) => match self.scanner.skip_if(b"\n") {
-                Some(_) => Some(Ok(Complete(2))),
+                Some(_) => Some(Ok(Complete(()))),
                 None => if self.eof() {
                     Some(Ok(Incomplete))
                 } else {
@@ -490,7 +505,7 @@ impl<'buffer> HttpPartParser<'buffer> {
                 },
             },
             None => match self.scanner.skip_if(b"\n") {
-                Some(_) => Some(Ok(Complete(1))),
+                Some(_) => Some(Ok(Complete(()))),
                 None => if self.eof() {
                     Some(Ok(Incomplete))
                 } else {
