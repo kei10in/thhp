@@ -391,15 +391,12 @@ impl<'buffer> HttpPartParser<'buffer> {
         result: &'header mut Vec<HeaderField<'buffer>>,
     ) -> Result<Status<(&'header mut Vec<HeaderField<'buffer>>)>> {
         loop {
-            if let Some(r) = self.eol() {
-                return r.map(|x| match x {
-                    Complete(_) => Complete(result),
-                    Incomplete => Incomplete,
-                });
+            if complete!(self.skip_eol()?) {
+                return Ok(Complete(result));
+            } else {
+                let header = complete!(self.parse_header_field()?);
+                result.push(header);
             }
-
-            let header = complete!(self.parse_header_field()?);
-            result.push(header);
         }
     }
 
@@ -462,16 +459,6 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn skip_empty_lines(&mut self) -> Result<Status<()>> {
-        loop {
-            match self.eol() {
-                Some(v) => complete!(v?),
-                None => return Ok(Complete(())),
-            }
-        }
-    }
-
-    #[inline]
     fn consume_eol(&mut self) -> Option<Result<Status<()>>> {
         match self.scanner.skip_if(b"\r\n") {
             Some(_) => Some(Ok(Complete(()))),
@@ -494,24 +481,31 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn eol(&mut self) -> Option<Result<Status<()>>> {
-        match self.scanner.skip_if(b"\r") {
-            Some(_) => match self.scanner.skip_if(b"\n") {
-                Some(_) => Some(Ok(Complete(()))),
-                None => if self.eof() {
-                    Some(Ok(Incomplete))
-                } else {
-                    Some(Err(InvalidNewLine.into()))
-                },
+    fn skip_eol(&mut self) -> Result<Status<bool>> {
+        match self.scanner.peek(0) {
+            Some(&b'\r') => match self.scanner.peek(1) {
+                Some(&b'\n') => {
+                    unsafe { self.scanner.skip_unchecked(2) };
+                    Ok(Complete(true))
+                }
+                Some(_) => Err(InvalidNewLine.into()),
+                None => Ok(Incomplete),
             },
-            None => match self.scanner.skip_if(b"\n") {
-                Some(_) => Some(Ok(Complete(()))),
-                None => if self.eof() {
-                    Some(Ok(Incomplete))
-                } else {
-                    None
-                },
-            },
+            Some(&b'\n') => {
+                unsafe { self.scanner.skip_unchecked(1) };
+                Ok(Complete(true))
+            }
+            Some(_) => Ok(Complete(false)),
+            None => Ok(Incomplete),
+        }
+    }
+
+    #[inline]
+    fn skip_empty_lines(&mut self) -> Result<Status<()>> {
+        loop {
+            if !complete!(self.skip_eol()?) {
+                return Ok(Complete(()));
+            }
         }
     }
 }

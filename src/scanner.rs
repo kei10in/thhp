@@ -19,6 +19,16 @@ impl<'a> Scanner<'a> {
     }
 
     #[inline]
+    pub fn peek(&self, index: usize) -> Option<&u8> {
+        self.buffer.get(index)
+    }
+
+    #[inline]
+    pub unsafe fn skip_unchecked(&mut self, count: usize) {
+        self.buffer = self.buffer.get_unchecked(count..);
+    }
+
+    #[inline]
     pub fn is_head_of(&self, trunk: &[u8]) -> bool {
         return trunk.starts_with(self.buffer);
     }
