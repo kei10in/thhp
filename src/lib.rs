@@ -464,7 +464,7 @@ impl<'buffer> HttpPartParser<'buffer> {
     #[inline]
     fn skip_empty_lines(&mut self) -> Result<Status<()>> {
         loop {
-            match self.consume_eol() {
+            match self.eol() {
                 Some(v) => complete!(v?),
                 None => return Ok(Complete(())),
             }
@@ -473,21 +473,21 @@ impl<'buffer> HttpPartParser<'buffer> {
 
     #[inline]
     fn consume_eol(&mut self) -> Option<Result<Status<()>>> {
-        match self.scanner.skip_if(b"\r") {
-            Some(_) => match self.scanner.skip_if(b"\n") {
-                Some(_) => Some(Ok(Complete(()))),
-                None => if self.eof() {
-                    Some(Ok(Incomplete))
-                } else {
-                    Some(Err(InvalidNewLine.into()))
-                },
-            },
+        match self.scanner.skip_if(b"\r\n") {
+            Some(_) => Some(Ok(Complete(()))),
             None => match self.scanner.skip_if(b"\n") {
                 Some(_) => Some(Ok(Complete(()))),
-                None => if self.eof() {
-                    Some(Ok(Incomplete))
-                } else {
-                    None
+                None => match self.scanner.skip_if(b"\r") {
+                    Some(_) => if self.eof() {
+                        Some(Ok(Incomplete))
+                    } else {
+                        Some(Err(InvalidNewLine.into()))
+                    },
+                    None => if self.eof() {
+                        Some(Ok(Incomplete))
+                    } else {
+                        None
+                    },
                 },
             },
         }
