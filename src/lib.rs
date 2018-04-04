@@ -304,8 +304,11 @@ impl<'buffer> HttpPartParser<'buffer> {
     fn parse_request_http_version(&mut self) -> Result<Status<u8>> {
         match self.parse_http_version() {
             v @ Ok(Complete(_)) => {
-                self.consume_eol().unwrap_or(Err(InvalidVersion.into()))?;
-                v
+                if complete!(self.consume_eol()?) {
+                    v
+                } else {
+                    Err(InvalidVersion.into())
+                }
             }
             v @ _ => v,
         }
@@ -346,9 +349,11 @@ impl<'buffer> HttpPartParser<'buffer> {
     fn parse_response_reason_phrase(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_reason_char(x)) {
             Some(v) => {
-                self.consume_eol()
-                    .unwrap_or(Err(InvalidReasonPhrase.into()))?;
-                Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
+                if complete!(self.consume_eol()?) {
+                    Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
+                } else {
+                    Err(InvalidReasonPhrase.into())
+                }
             }
             None => Ok(Incomplete),
         }
@@ -423,8 +428,11 @@ impl<'buffer> HttpPartParser<'buffer> {
     fn parse_field_value(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_field_value_char(x)) {
             Some(v) => {
-                self.consume_eol().unwrap_or(Err(InvalidFieldValue.into()))?;
-                Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
+                if complete!(self.consume_eol()?) {
+                    Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
+                } else {
+                    Err(InvalidFieldValue.into())
+                }
             }
             None => Ok(Incomplete),
         }
@@ -459,21 +467,21 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn consume_eol(&mut self) -> Option<Result<Status<()>>> {
+    fn consume_eol(&mut self) -> Result<Status<bool>> {
         match self.scanner.skip_if(b"\r\n") {
-            Some(_) => Some(Ok(Complete(()))),
+            Some(_) => Ok(Complete(true)),
             None => match self.scanner.skip_if(b"\n") {
-                Some(_) => Some(Ok(Complete(()))),
+                Some(_) => Ok(Complete(true)),
                 None => match self.scanner.skip_if(b"\r") {
                     Some(_) => if self.eof() {
-                        Some(Ok(Incomplete))
+                        Ok(Incomplete)
                     } else {
-                        Some(Err(InvalidNewLine.into()))
+                        Err(InvalidNewLine.into())
                     },
                     None => if self.eof() {
-                        Some(Ok(Incomplete))
+                        Ok(Incomplete)
                     } else {
-                        None
+                        Ok(Complete(false))
                     },
                 },
             },
@@ -532,7 +540,7 @@ mod tests {
         let value = parser.parse_field_value();
         assert_eq!(value.unwrap(), Complete("b"));
 
-        assert!(parser.consume_eol().is_some());
+        assert!(parser.consume_eol().is_ok());
         assert!(parser.eof());
     }
 
@@ -554,7 +562,7 @@ mod tests {
         let value = parser.parse_field_value();
         assert_eq!(value.unwrap(), Complete("b"));
 
-        assert!(parser.consume_eol().is_some());
+        assert!(parser.consume_eol().is_ok());
         assert!(parser.eof());
     }
 
