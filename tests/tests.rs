@@ -72,6 +72,11 @@ mod request {
         good!(b"GET / HTTP/1.1\r\na:b\r\n\n");
         good!(b"GET / HTTP/1.1\r\na:b\n\n");
         good!(b"GET / HTTP/1.1\r\na:b\n\r\n");
+
+        good!(b"\r\nGET / HTTP/1.1\r\na:b\n\r\n");
+        good!(b"\r\n\r\nGET / HTTP/1.1\r\na:b\n\r\n");
+        good!(b"\nGET / HTTP/1.1\r\na:b\n\r\n");
+        good!(b"\n\nGET / HTTP/1.1\r\na:b\n\r\n");
     }
 
     #[test]
@@ -87,6 +92,8 @@ mod request {
         invalid_field_value!(b"GET / HTTP/1.1\r\nabc:x\x01z\r\n\r\n");
         invalid_new_line!(b"GET / HTTP/1.1\r\nabc:xyz\ra\n\r\n");
         invalid_new_line!(b"GET / HTTP/1.1\r\nabc:xyz\r\n\ra\n");
+
+        invalid_new_line!(b"\rGET / HTTP/1.1\r\n\r\n");
     }
 
     #[test]
@@ -168,6 +175,11 @@ mod response {
         good!(b"HTTP/1.1 200 OK\r\na:b\r\n\n");
         good!(b"HTTP/1.1 200 OK\r\na:b\n\n");
         good!(b"HTTP/1.1 200 OK\r\na:b\n\r\n");
+
+        good!(b"\r\nHTTP/1.1 200 OK\r\na:b\n\r\n");
+        good!(b"\r\n\r\nHTTP/1.1 200 OK\r\na:b\n\r\n");
+        good!(b"\nHTTP/1.1 200 OK\r\na:b\n\r\n");
+        good!(b"\n\r\nHTTP/1.1 200 OK\r\na:b\n\r\n");
     }
 
     #[test]
