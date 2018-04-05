@@ -1,0 +1,12 @@
+language: rust
+dist: trusty
+sudo: false
+rust:
+  - nightly
+  - beta
+  - stable
+  - 1.10.0
+cache:
+  directoriesca:
+    - target/debug/deps
+    - target/debug/build
