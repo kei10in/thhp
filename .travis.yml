@@ -10,3 +10,9 @@ cache:
   directoriesca:
     - target/debug/deps
     - target/debug/build
+script:
+  - cargo build --verbose
+  - cargo test --verbose
+  - if [ "$TRAVIS_RUST_VERSION" = "nightly" ]; then
+      cargo bench --verbose
+    fi
