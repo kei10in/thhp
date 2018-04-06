@@ -8,7 +8,7 @@ error-chain = "0.11"
 
 [dev-dependencies]
 httparse = "1.2"
-pico-sys = "0.0"
+picohttpparser-sys = { git = "https://github.com/kevinswiber/picohttpparser-sys" }
 
 [profile.bench]
 lto = true

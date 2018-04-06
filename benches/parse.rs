@@ -2,7 +2,7 @@
 
 extern crate httparse;
 extern crate httpparser;
-extern crate pico_sys as pico;
+extern crate picohttpparser_sys as pico;
 
 extern crate test;
 
@@ -20,34 +20,29 @@ Cookie: wp_ozh_wsa_visits=2; wp_ozh_wsa_visit_lasttime=xxxxxxxxxx; __utma=xxxxxx
 
 #[bench]
 fn bench_pico(b: &mut test::Bencher) {
-    use std::mem;
+    use std::ptr;
 
-    #[repr(C)]
-    #[derive(Clone, Copy)]
-    struct Header<'a>(&'a [u8], &'a [u8]);
-
-    #[repr(C)]
-    struct Headers<'a>(&'a mut [Header<'a>]);
-    let method = [0i8; 16];
-    let path = [0i8; 16];
+    let mut method: *const _ = ptr::null_mut();
+    let mut method_len = 0;
+    let mut path: *const _ = ptr::null_mut();
+    let mut path_len = 0;
     let mut minor_version = 0;
-    let mut h = [Header(&[], &[]); 16];
-    let mut h_len = h.len();
-    let headers = Headers(&mut h);
+    let mut headers = [pico::phr_header::default(); 16];
+    let mut headers_len = headers.len();
     let prev_buf_len = 0;
 
     b.iter(|| {
         let ret = unsafe {
-            pico::ffi::phr_parse_request(
+            pico::phr_parse_request(
                 REQ.as_ptr() as *const _,
                 REQ.len(),
-                &mut method.as_ptr(),
-                &mut 16,
-                &mut path.as_ptr(),
-                &mut 16,
+                &mut method,
+                &mut method_len,
+                &mut path,
+                &mut path_len,
                 &mut minor_version,
-                mem::transmute::<*mut Header, *mut pico::ffi::phr_header>(headers.0.as_mut_ptr()),
-                &mut h_len as *mut usize as *mut _,
+                headers.as_mut_ptr(),
+                &mut headers_len,
                 prev_buf_len,
             )
         };
