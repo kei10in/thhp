@@ -9,13 +9,13 @@ impl<'a> Scanner<'a> {
     }
 
     #[inline]
-    pub fn rest(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.buffer.len()
     }
 
     #[inline]
     pub fn empty(&self) -> bool {
-        self.rest() == 0
+        self.len() == 0
     }
 
     #[inline]

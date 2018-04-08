@@ -63,9 +63,12 @@ impl<'buffer, 'header> Request<'buffer, 'header> {
     pub fn parse(
         buf: &'buffer [u8],
         headers: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<Status<Request<'buffer, 'header>>> {
+    ) -> Result<Status<(Request<'buffer, 'header>, usize)>> {
         let mut parser = HttpPartParser::new(buf);
-        return parser.parse_request(headers);
+        Ok(Complete((
+            complete!(parser.parse_request(headers)?),
+            buf.len() - parser.len(),
+        )))
     }
 }
 
@@ -83,9 +86,12 @@ impl<'buffer, 'header> Response<'buffer, 'header> {
     pub fn parse(
         buf: &'buffer [u8],
         headers: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<Status<Response<'buffer, 'header>>> {
+    ) -> Result<Status<(Response<'buffer, 'header>, usize)>> {
         let mut parser = HttpPartParser::new(buf);
-        return parser.parse_response(headers);
+        Ok(Complete((
+            complete!(parser.parse_response(headers)?),
+            buf.len() - parser.len(),
+        )))
     }
 }
 
@@ -243,6 +249,11 @@ impl<'buffer> HttpPartParser<'buffer> {
         HttpPartParser {
             scanner: Scanner::new(buf),
         }
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.scanner.len()
     }
 
     #[inline]
@@ -571,7 +582,8 @@ mod tests {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
         let result = Response::parse(b"HTTP/1.1 200 OK\r\nname:value\r\n\r\n", &mut headers);
         assert!(result.is_ok());
-        let req = result.unwrap().unwrap();
+        let (req, c) = result.unwrap().unwrap();
+        assert_eq!(c, 31);
         assert_eq!(req.minor_version, 1);
         assert_eq!(req.status, 200);
         assert_eq!(req.reason, "OK");
@@ -585,7 +597,8 @@ mod tests {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
         let result = Request::parse(b"GET / HTTP/1.1\r\nname:value\r\n\r\n", &mut headers);
         assert!(result.is_ok());
-        let req = result.unwrap().unwrap();
+        let (req, c) = result.unwrap().unwrap();
+        assert_eq!(c, 30);
         assert_eq!(req.method, "GET");
         assert_eq!(req.target, "/");
         assert_eq!(req.minor_version, 1);
