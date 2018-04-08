@@ -578,36 +578,6 @@ mod tests {
     }
 
     #[test]
-    fn parse_ok_response() {
-        let mut headers = Vec::<HeaderField>::with_capacity(10);
-        let result = Response::parse(b"HTTP/1.1 200 OK\r\nname:value\r\n\r\n", &mut headers);
-        assert!(result.is_ok());
-        let (req, c) = result.unwrap().unwrap();
-        assert_eq!(c, 31);
-        assert_eq!(req.minor_version, 1);
-        assert_eq!(req.status, 200);
-        assert_eq!(req.reason, "OK");
-        assert_eq!(req.headers.len(), 1);
-        assert_eq!(req.headers[0].name, "name");
-        assert_eq!(req.headers[0].value, "value");
-    }
-
-    #[test]
-    fn parse_get_request() {
-        let mut headers = Vec::<HeaderField>::with_capacity(10);
-        let result = Request::parse(b"GET / HTTP/1.1\r\nname:value\r\n\r\n", &mut headers);
-        assert!(result.is_ok());
-        let (req, c) = result.unwrap().unwrap();
-        assert_eq!(c, 30);
-        assert_eq!(req.method, "GET");
-        assert_eq!(req.target, "/");
-        assert_eq!(req.minor_version, 1);
-        assert_eq!(req.headers.len(), 1);
-        assert_eq!(req.headers[0].name, "name");
-        assert_eq!(req.headers[0].value, "value");
-    }
-
-    #[test]
     fn parse_a_header_field() {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
         let mut parser = HttpPartParser::new(b"name:value\r\n\r\n");

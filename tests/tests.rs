@@ -8,10 +8,24 @@ mod request {
 
     macro_rules! good {
         ($buf: expr) => {
+            good!($buf, |_req| {})
+        };
+        ($buf: expr, |$req: ident| $body: expr) => {
             {
                 let mut headers = Vec::<HeaderField>::with_capacity(10);
-                let r = Request::parse($buf, &mut headers);
-                assert!(r.is_ok());
+                match Request::parse($buf, &mut headers) {
+                    Ok(Complete((req, c))) => {
+                        assert_eq!(c, $buf.len());
+                        closure(req);
+                    },
+                    _ => {
+                        assert!(false)
+                    }
+                }
+
+                fn closure($req: Request) {
+                    $body
+                }
             }
         }
     }
@@ -63,16 +77,41 @@ mod request {
     }
 
     #[test]
-    fn good_request() {
-        good!(b"GET / HTTP/1.1\r\n\r\n");
+    fn simple_request() {
+        good!(b"GET / HTTP/1.1\r\n\r\n", |req| {
+            assert_eq!(req.method, "GET");
+            assert_eq!(req.target, "/");
+            assert_eq!(req.minor_version, 1);
+            assert_eq!(req.headers.len(), 0);
+        });
+    }
+
+    #[test]
+    fn simple_request_with_headers() {
+        good!(b"GET / HTTP/1.1\r\na:b\r\nc:d\r\n\r\n", |req| {
+            assert_eq!(req.method, "GET");
+            assert_eq!(req.target, "/");
+            assert_eq!(req.minor_version, 1);
+            assert_eq!(req.headers.len(), 2);
+            assert_eq!(req.headers[0].name, "a");
+            assert_eq!(req.headers[0].value, "b");
+            assert_eq!(req.headers[1].name, "c");
+            assert_eq!(req.headers[1].value, "d");
+        });
+    }
+
+    #[test]
+    fn accept_various_new_lines() {
         good!(b"GET / HTTP/1.1\n\n");
         good!(b"GET / HTTP/1.1\r\n\n");
         good!(b"GET / HTTP/1.1\n\r\n");
-        good!(b"GET / HTTP/1.1\r\na:b\r\n\r\n");
         good!(b"GET / HTTP/1.1\r\na:b\r\n\n");
         good!(b"GET / HTTP/1.1\r\na:b\n\n");
         good!(b"GET / HTTP/1.1\r\na:b\n\r\n");
+    }
 
+    #[test]
+    fn skip_front_new_lines() {
         good!(b"\r\nGET / HTTP/1.1\r\na:b\n\r\n");
         good!(b"\r\n\r\nGET / HTTP/1.1\r\na:b\n\r\n");
         good!(b"\nGET / HTTP/1.1\r\na:b\n\r\n");
@@ -92,7 +131,6 @@ mod request {
         invalid_field_value!(b"GET / HTTP/1.1\r\nabc:x\x01z\r\n\r\n");
         invalid_new_line!(b"GET / HTTP/1.1\r\nabc:xyz\ra\n\r\n");
         invalid_new_line!(b"GET / HTTP/1.1\r\nabc:xyz\r\n\ra\n");
-
         invalid_new_line!(b"\rGET / HTTP/1.1\r\n\r\n");
     }
 
@@ -123,10 +161,22 @@ mod response {
 
     macro_rules! good {
         ($buf: expr) => {
+            good!($buf, |_res| {})
+        };
+        ($buf: expr, |$res: ident| $body: expr) => {
             {
                 let mut headers = Vec::<HeaderField>::with_capacity(10);
-                let r = Response::parse($buf, &mut headers);
-                assert!(r.is_ok());
+                match Response::parse($buf, &mut headers) {
+                    Ok(Complete((res, c))) => {
+                        assert_eq!(c, $buf.len());
+                        closure(res);
+                    }
+                    _ => assert!(false),
+                }
+
+                fn closure($res: Response) {
+                    $body
+                }
             }
         }
     }
@@ -166,16 +216,41 @@ mod response {
     }
 
     #[test]
-    fn good_request() {
-        good!(b"HTTP/1.1 200 OK\r\n\r\n");
+    fn simple_request() {
+        good!(b"HTTP/1.1 200 OK\r\n\r\n", |res| {
+            assert_eq!(res.minor_version, 1);
+            assert_eq!(res.status, 200);
+            assert_eq!(res.reason, "OK");
+            assert_eq!(res.headers.len(), 0);
+        })
+    }
+
+    #[test]
+    fn simple_request_with_headers() {
+        good!(b"HTTP/1.1 200 OK\r\na:b\r\nc:d\r\n\r\n", |res| {
+            assert_eq!(res.minor_version, 1);
+            assert_eq!(res.status, 200);
+            assert_eq!(res.reason, "OK");
+            assert_eq!(res.headers.len(), 2);
+            assert_eq!(res.headers[0].name, "a");
+            assert_eq!(res.headers[0].value, "b");
+            assert_eq!(res.headers[1].name, "c");
+            assert_eq!(res.headers[1].value, "d");
+        })
+    }
+
+    #[test]
+    fn accept_various_new_lines() {
         good!(b"HTTP/1.1 200 OK\n\n");
         good!(b"HTTP/1.1 200 OK\r\n\n");
         good!(b"HTTP/1.1 200 OK\n\r\n");
-        good!(b"HTTP/1.1 200 OK\r\na:b\r\n\r\n");
         good!(b"HTTP/1.1 200 OK\r\na:b\r\n\n");
         good!(b"HTTP/1.1 200 OK\r\na:b\n\n");
         good!(b"HTTP/1.1 200 OK\r\na:b\n\r\n");
+    }
 
+    #[test]
+    fn skip_front_new_lines() {
         good!(b"\r\nHTTP/1.1 200 OK\r\na:b\n\r\n");
         good!(b"\r\n\r\nHTTP/1.1 200 OK\r\na:b\n\r\n");
         good!(b"\nHTTP/1.1 200 OK\r\na:b\n\r\n");
