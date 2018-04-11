@@ -19,7 +19,7 @@ Connection: keep-alive\r\n\
 Cookie: wp_ozh_wsa_visits=2; wp_ozh_wsa_visit_lasttime=xxxxxxxxxx; __utma=xxxxxxxxx.xxxxxxxxxx.xxxxxxxxxx.xxxxxxxxxx.xxxxxxxxxx.x; __utmz=xxxxxxxxx.xxxxxxxxxx.x.x.utmccn=(referral)|utmcsr=reader.livedoor.com|utmcct=/reader/|utmcmd=referral\r\n\r\n";
 
 #[bench]
-fn bench_pico(b: &mut test::Bencher) {
+fn bench_picohttpparser(b: &mut test::Bencher) {
     use std::ptr;
 
     let mut method: *const _ = ptr::null_mut();
