@@ -1,8 +1,8 @@
 #![feature(test)]
 
 extern crate httparse;
-extern crate httpparser;
 extern crate picohttpparser_sys as pico;
+extern crate thhp;
 
 extern crate test;
 
@@ -68,11 +68,11 @@ fn bench_httparse(b: &mut test::Bencher) {
 }
 
 #[bench]
-fn bench_httpparser(b: &mut test::Bencher) {
-    let mut headers = Vec::<httpparser::HeaderField>::with_capacity(16);
+fn bench_thhp(b: &mut test::Bencher) {
+    let mut headers = Vec::<thhp::HeaderField>::with_capacity(16);
     b.iter(|| {
         headers.clear();
-        let res = httpparser::Request::parse(REQ, &mut headers);
+        let res = thhp::Request::parse(REQ, &mut headers);
         assert!(res.is_ok());
     });
     b.bytes = REQ.len() as u64;

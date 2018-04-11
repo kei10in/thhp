@@ -1,6 +1,6 @@
-extern crate httpparser;
+extern crate thhp;
 
-use httpparser::*;
+use thhp::*;
 
 #[cfg(test)]
 mod request {

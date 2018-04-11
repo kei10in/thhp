@@ -1,5 +1,5 @@
 [package]
-name = "httpparser"
+name = "thhp"
 version = "0.1.0"
 authors = ["kei10in <kei10in@gmail.com>"]
 
