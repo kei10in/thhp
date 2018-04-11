@@ -8,7 +8,7 @@ error-chain = "0.11"
 
 [dev-dependencies]
 httparse = "1.2"
-picohttpparser-sys = { git = "https://github.com/kei10in/picohttpparser-sys" }
+picohttpparser-sys = { git = "https://github.com/kevinswiber/picohttpparser-sys" }
 
 [profile.bench]
 lto = true
@@ -16,4 +16,4 @@ codegen-units = 1
 opt-level = 3
 
 [features]
-nightly = [ "picohttpparser-sys/nightly" ]
+nightly = [ "picohttpparser-sys/sse4" ]
