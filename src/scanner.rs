@@ -1,3 +1,6 @@
+#[cfg(feature = "nightly")]
+use simd;
+
 pub struct Scanner<'a> {
     buffer: &'a [u8],
 }
@@ -54,11 +57,33 @@ impl<'a> Scanner<'a> {
     }
 
     #[inline]
-    pub fn read_while<A>(&mut self, mut acceptable: A) -> Option<&'a [u8]>
+    pub fn read_while<A>(&mut self, acceptable: A) -> Option<&'a [u8]>
     where
         A: FnMut(u8) -> bool,
     {
-        let mut i = 0;
+        self.read_while_continue_with(0, acceptable)
+    }
+
+    #[cfg(feature = "nightly")]
+    #[inline]
+    pub fn read_while_fast<A>(&mut self, range: &[u8], acceptable: A) -> Option<&'a [u8]>
+    where
+        A: FnMut(u8) -> bool,
+    {
+        let v = simd::index_of_range_or_last_16bytes_boundary(self.buffer, range);
+        return self.read_while_continue_with(v, acceptable);
+    }
+
+    #[inline]
+    pub fn read_while_continue_with<A>(
+        &mut self,
+        cont: usize,
+        mut acceptable: A,
+    ) -> Option<&'a [u8]>
+    where
+        A: FnMut(u8) -> bool,
+    {
+        let mut i = cont;
         loop {
             if let Some(val) = self.buffer.get(i..i + 8) {
                 unsafe {
@@ -162,5 +187,35 @@ mod tests {
 
         let r1 = s.read_while(|x| b'A' <= x && x <= b'Z');
         assert_eq!(r1, Some(b"HELLOWORLD".as_ref()));
+    }
+
+    mod simd {
+        #![cfg(feature = "nightly")]
+
+        use scanner::*;
+
+        macro_rules! check {
+            ($buf:expr, $expect:expr) => {
+                let mut s = Scanner::new($buf);
+                let r = s.read_while_fast(b";;", |x| x != b';');
+                assert_eq!(r, $expect);
+            };
+        }
+
+        #[test]
+        fn test_read_while_fast() {
+            check!(b"a", None);
+            check!(b"a;", Some(b"a".as_ref()));
+            check!(b"aaaaaaaaaaaaaaa;", Some(b"aaaaaaaaaaaaaaa".as_ref()));
+            check!(b"aaaaaaaaaaaaaaaa;", Some(b"aaaaaaaaaaaaaaaa".as_ref()));
+            check!(
+                b"aaaaaaaaaaaaaaaa;aaaaaaaaaaaaaaa",
+                Some(b"aaaaaaaaaaaaaaaa".as_ref())
+            );
+            check!(
+                b"aaaaaaaaaaaaaaaaaaaaaaaaaa;aaaaa",
+                Some(b"aaaaaaaaaaaaaaaaaaaaaaaaaa".as_ref())
+            );
+        }
     }
 }

@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "nightly", feature(cfg_target_feature, target_feature, stdsimd))]
+
 use std::str;
 
 #[macro_use]
@@ -5,6 +7,7 @@ extern crate error_chain;
 
 mod errors;
 mod scanner;
+mod simd;
 
 pub use errors::*;
 use scanner::Scanner;
@@ -41,12 +44,12 @@ impl<T> Status<T> {
 }
 
 macro_rules! complete {
-    ($expr:expr) => (match $expr {
-        $crate::Status::Complete(val) => val,
-        $crate::Status::Incomplete => {
-            return Ok($crate::Status::Incomplete)
+    ($expr:expr) => {
+        match $expr {
+            $crate::Status::Complete(val) => val,
+            $crate::Status::Incomplete => return Ok($crate::Status::Incomplete),
         }
-    })
+    };
 }
 
 pub struct Request<'buffer, 'header>
@@ -437,7 +440,7 @@ impl<'buffer> HttpPartParser<'buffer> {
 
     #[inline]
     fn parse_field_value(&mut self) -> Result<Status<&'buffer str>> {
-        match self.scanner.read_while(|x| is_field_value_char(x)) {
+        match self.read_field_value() {
             Some(v) => {
                 if complete!(self.consume_eol()?) {
                     Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
@@ -447,6 +450,22 @@ impl<'buffer> HttpPartParser<'buffer> {
             }
             None => Ok(Incomplete),
         }
+    }
+
+    #[inline]
+    fn read_field_value(&mut self) -> Option<&'buffer [u8]> {
+        #[cfg(feature = "nightly")]
+        {
+            if is_x86_feature_detected!("sse4.2") {
+                return self.scanner
+                    .read_while_fast(b"\x00\x08\x0A\x1F\x7F\xFF", |x| is_field_value_char(x));
+            } else {
+                return self.scanner.read_while(|x| is_field_value_char(x));
+            }
+        }
+
+        #[cfg(not(feature = "nightly"))]
+        return self.scanner.read_while(|x| is_field_value_char(x));
     }
 
     #[inline]
@@ -531,7 +550,7 @@ impl<'buffer> HttpPartParser<'buffer> {
 
 #[cfg(test)]
 mod tests {
-    use ::*;
+    use *;
 
     #[test]
     fn http_part_parser_request_test() {

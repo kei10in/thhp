@@ -14,3 +14,6 @@ picohttpparser-sys = "1.0"
 lto = true
 codegen-units = 1
 opt-level = 3
+
+[features]
+nightly = []
