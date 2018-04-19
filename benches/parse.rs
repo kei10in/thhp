@@ -18,6 +18,11 @@ Keep-Alive: 115\r\n\
 Connection: keep-alive\r\n\
 Cookie: wp_ozh_wsa_visits=2; wp_ozh_wsa_visit_lasttime=xxxxxxxxxx; __utma=xxxxxxxxx.xxxxxxxxxx.xxxxxxxxxx.xxxxxxxxxx.xxxxxxxxxx.x; __utmz=xxxxxxxxx.xxxxxxxxxx.x.x.utmccn=(referral)|utmcsr=reader.livedoor.com|utmcct=/reader/|utmcmd=referral\r\n\r\n";
 
+const REQ_SHORT: &'static [u8] = b"\
+GET / HTTP/1.0\r\n\
+Host: example.com\r\n\
+Connection: close\r\n\r\n";
+
 #[bench]
 fn bench_picohttpparser(b: &mut test::Bencher) {
     use std::ptr;
@@ -52,6 +57,39 @@ fn bench_picohttpparser(b: &mut test::Bencher) {
 }
 
 #[bench]
+fn bench_picohttpparser_short(b: &mut test::Bencher) {
+    use std::ptr;
+
+    let mut method: *const _ = ptr::null_mut();
+    let mut method_len = 0;
+    let mut path: *const _ = ptr::null_mut();
+    let mut path_len = 0;
+    let mut minor_version = 0;
+    let mut headers = [pico::phr_header::default(); 16];
+    let mut headers_len = headers.len();
+    let prev_buf_len = 0;
+
+    b.iter(|| {
+        let ret = unsafe {
+            pico::phr_parse_request(
+                REQ_SHORT.as_ptr() as *const _,
+                REQ_SHORT.len(),
+                &mut method,
+                &mut method_len,
+                &mut path,
+                &mut path_len,
+                &mut minor_version,
+                headers.as_mut_ptr(),
+                &mut headers_len,
+                prev_buf_len,
+            )
+        };
+        assert_eq!(ret, REQ_SHORT.len() as i32);
+    });
+    b.bytes = REQ_SHORT.len() as u64;
+}
+
+#[bench]
 fn bench_httparse(b: &mut test::Bencher) {
     let mut headers = [httparse::Header {
         name: "",
@@ -68,12 +106,43 @@ fn bench_httparse(b: &mut test::Bencher) {
 }
 
 #[bench]
+fn bench_httparse_short(b: &mut test::Bencher) {
+    let mut headers = [httparse::Header {
+        name: "",
+        value: &[],
+    }; 16];
+    let mut req = httparse::Request::new(&mut headers);
+    b.iter(|| {
+        assert_eq!(
+            req.parse(REQ_SHORT).unwrap(),
+            httparse::Status::Complete(REQ_SHORT.len())
+        );
+    });
+    b.bytes = REQ_SHORT.len() as u64;
+}
+
+#[bench]
 fn bench_thhp(b: &mut test::Bencher) {
     let mut headers = Vec::<thhp::HeaderField>::with_capacity(16);
     b.iter(|| {
         headers.clear();
-        let res = thhp::Request::parse(REQ, &mut headers);
-        assert!(res.is_ok());
+        match thhp::Request::parse(REQ, &mut headers) {
+            Ok(thhp::Complete((_, len))) => assert_eq!(len, REQ.len()),
+            _ => assert!(false),
+        }
     });
     b.bytes = REQ.len() as u64;
+}
+
+#[bench]
+fn bench_thhp_short(b: &mut test::Bencher) {
+    let mut headers = Vec::<thhp::HeaderField>::with_capacity(16);
+    b.iter(|| {
+        headers.clear();
+        match thhp::Request::parse(REQ_SHORT, &mut headers) {
+            Ok(thhp::Complete((_, len))) => assert_eq!(len, REQ_SHORT.len()),
+            _ => assert!(false),
+        }
+    });
+    b.bytes = REQ_SHORT.len() as u64;
 }
