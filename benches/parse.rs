@@ -37,10 +37,11 @@ fn bench_picohttpparser(b: &mut test::Bencher) {
     let prev_buf_len = 0;
 
     b.iter(|| {
+        let req = test::black_box(REQ);
         let ret = unsafe {
             pico::phr_parse_request(
-                REQ.as_ptr() as *const _,
-                REQ.len(),
+                req.as_ptr() as *const _,
+                req.len(),
                 &mut method,
                 &mut method_len,
                 &mut path,
@@ -51,7 +52,7 @@ fn bench_picohttpparser(b: &mut test::Bencher) {
                 prev_buf_len,
             )
         };
-        assert_eq!(ret, REQ.len() as i32);
+        assert_eq!(ret, req.len() as i32);
     });
     b.bytes = REQ.len() as u64;
 }
@@ -70,10 +71,11 @@ fn bench_picohttpparser_short(b: &mut test::Bencher) {
     let prev_buf_len = 0;
 
     b.iter(|| {
+        let req = test::black_box(REQ_SHORT);
         let ret = unsafe {
             pico::phr_parse_request(
-                REQ_SHORT.as_ptr() as *const _,
-                REQ_SHORT.len(),
+                req.as_ptr() as *const _,
+                req.len(),
                 &mut method,
                 &mut method_len,
                 &mut path,
@@ -84,7 +86,7 @@ fn bench_picohttpparser_short(b: &mut test::Bencher) {
                 prev_buf_len,
             )
         };
-        assert_eq!(ret, REQ_SHORT.len() as i32);
+        assert_eq!(ret, req.len() as i32);
     });
     b.bytes = REQ_SHORT.len() as u64;
 }
@@ -95,10 +97,12 @@ fn bench_httparse(b: &mut test::Bencher) {
         name: "",
         value: &[],
     }; 16];
-    let mut req = httparse::Request::new(&mut headers);
+
     b.iter(|| {
+        let req = test::black_box(REQ);
+        let mut request = httparse::Request::new(&mut headers);
         assert_eq!(
-            req.parse(REQ).unwrap(),
+            request.parse(req).unwrap(),
             httparse::Status::Complete(REQ.len())
         );
     });
@@ -111,11 +115,13 @@ fn bench_httparse_short(b: &mut test::Bencher) {
         name: "",
         value: &[],
     }; 16];
-    let mut req = httparse::Request::new(&mut headers);
+
     b.iter(|| {
+        let req = test::black_box(REQ_SHORT);
+        let mut request = httparse::Request::new(&mut headers);
         assert_eq!(
-            req.parse(REQ_SHORT).unwrap(),
-            httparse::Status::Complete(REQ_SHORT.len())
+            request.parse(req).unwrap(),
+            httparse::Status::Complete(req.len())
         );
     });
     b.bytes = REQ_SHORT.len() as u64;
@@ -126,8 +132,9 @@ fn bench_thhp(b: &mut test::Bencher) {
     let mut headers = Vec::<thhp::HeaderField>::with_capacity(16);
     b.iter(|| {
         headers.clear();
-        match thhp::Request::parse(REQ, &mut headers) {
-            Ok(thhp::Complete((_, len))) => assert_eq!(len, REQ.len()),
+        let req = test::black_box(REQ);
+        match thhp::Request::parse(req, &mut headers) {
+            Ok(thhp::Complete((ref _request, len))) => assert_eq!(len, req.len()),
             _ => assert!(false),
         }
     });
@@ -139,8 +146,9 @@ fn bench_thhp_short(b: &mut test::Bencher) {
     let mut headers = Vec::<thhp::HeaderField>::with_capacity(16);
     b.iter(|| {
         headers.clear();
-        match thhp::Request::parse(REQ_SHORT, &mut headers) {
-            Ok(thhp::Complete((_, len))) => assert_eq!(len, REQ_SHORT.len()),
+        let req = test::black_box(REQ_SHORT);
+        match thhp::Request::parse(req, &mut headers) {
+            Ok(thhp::Complete((ref _request, len))) => assert_eq!(len, req.len()),
             _ => assert!(false),
         }
     });
