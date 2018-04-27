@@ -296,8 +296,11 @@ impl<'buffer> HttpPartParser<'buffer> {
     fn parse_request_method(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_tchar(x)) {
             Some(v) => {
-                self.consume_space().ok_or(InvalidMethod)?;
-                Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
+                if self.consume_space() {
+                    Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
+                } else {
+                    Err(InvalidMethod.into())
+                }
             }
             None => Ok(Incomplete),
         }
@@ -307,8 +310,11 @@ impl<'buffer> HttpPartParser<'buffer> {
     fn parse_request_target(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_vchar(x)) {
             Some(v) => {
-                self.consume_space().ok_or(InvalidPath)?;
-                Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
+                if self.consume_space() {
+                    Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
+                } else {
+                    Err(InvalidPath.into())
+                }
             }
             None => Ok(Incomplete),
         }
@@ -317,29 +323,32 @@ impl<'buffer> HttpPartParser<'buffer> {
     #[inline]
     fn parse_request_http_version(&mut self) -> Result<Status<u8>> {
         match self.parse_http_version() {
-            v @ Ok(Complete(_)) => {
+            Ok(Complete(v)) => {
                 if complete!(self.consume_eol()?) {
-                    v
+                    Ok(Complete(v))
                 } else {
                     Err(InvalidVersion.into())
                 }
             }
-            v @ _ => v,
+            v => v,
         }
     }
 
     #[inline]
     fn parse_response_http_version(&mut self) -> Result<Status<u8>> {
         match self.parse_http_version() {
-            v @ Ok(Complete(_)) => {
+            Ok(Complete(v)) => {
                 if self.eof() {
                     Ok(Incomplete)
                 } else {
-                    self.consume_space().ok_or(InvalidVersion)?;
-                    v
+                    if self.consume_space() {
+                        Ok(Complete(v))
+                    } else {
+                        Err(InvalidVersion.into())
+                    }
                 }
             }
-            v @ _ => v,
+            v => v,
         }
     }
 
@@ -347,11 +356,14 @@ impl<'buffer> HttpPartParser<'buffer> {
     fn parse_response_status_code(&mut self) -> Result<Status<u16>> {
         match self.scanner.read_while(|x| is_digit(x)) {
             Some(v) => if v.len() == 3 {
-                self.consume_space().ok_or(InvalidStatusCode)?;
-                unsafe { str::from_utf8_unchecked(v) }
-                    .parse::<u16>()
-                    .map(|x| Complete(x))
-                    .or(Err(InvalidStatusCode.into()))
+                if self.consume_space() {
+                    unsafe { str::from_utf8_unchecked(v) }
+                        .parse::<u16>()
+                        .map(|x| Complete(x))
+                        .or(Err(InvalidStatusCode.into()))
+                } else {
+                    Err(InvalidStatusCode.into())
+                }
             } else {
                 Err(InvalidStatusCode.into())
             },
@@ -385,22 +397,20 @@ impl<'buffer> HttpPartParser<'buffer> {
                     && *http.get_unchecked(6) == b'.'
                 {
                     let c = http.get_unchecked(7);
-                    return match to_digit(*c) {
+                    match to_digit(*c) {
                         Some(v) => Ok(Complete(v)),
                         None => Err(InvalidVersion.into()),
-                    };
+                    }
                 } else {
-                    return Err(InvalidVersion.into());
+                    Err(InvalidVersion.into())
                 }
-            };
+            }
+        } else if self.scanner.empty() {
+            Ok(Incomplete)
+        } else if self.scanner.is_head_of(b"HTTP/1.") {
+            Ok(Incomplete)
         } else {
-            if self.scanner.empty() {
-                return Ok(Incomplete);
-            } else if self.scanner.is_head_of(b"HTTP/1.") {
-                return Ok(Incomplete);
-            } else {
-                return Err(InvalidVersion.into());
-            };
+            Err(InvalidVersion.into())
         }
     }
 
@@ -411,12 +421,14 @@ impl<'buffer> HttpPartParser<'buffer> {
     ) -> Result<Status<(&'header mut Vec<HeaderField<'buffer>>)>> {
         loop {
             if complete!(self.skip_eol()?) {
-                return Ok(Complete(result));
-            } else {
-                let header = complete!(self.parse_header_field()?);
-                result.push(header);
+                break;
             }
+
+            let header = complete!(self.parse_header_field()?);
+            result.push(header);
         }
+
+        Ok(Complete(result))
     }
 
     #[inline]
@@ -431,8 +443,11 @@ impl<'buffer> HttpPartParser<'buffer> {
     fn parse_field_name(&mut self) -> Result<Status<&'buffer str>> {
         match self.scanner.read_while(|x| is_tchar(x)) {
             Some(v) => {
-                self.consume_name_value_separator().ok_or(InvalidFieldName)?;
-                Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
+                if self.consume_name_value_separator() {
+                    Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
+                } else {
+                    Err(InvalidFieldName.into())
+                }
             }
             None => Ok(Incomplete),
         }
@@ -469,23 +484,22 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn consume_space(&mut self) -> Option<()> {
+    fn consume_space(&mut self) -> bool {
         self.scanner.skip_if(b" ")
     }
 
     #[inline]
-    fn consume_name_value_separator(&mut self) -> Option<()> {
-        match self.consume_colon() {
-            Some(_) => {
-                self.consume_optional_whitespace();
-                Some(())
-            }
-            None => None,
+    fn consume_name_value_separator(&mut self) -> bool {
+        if self.consume_colon() {
+            self.consume_optional_whitespace();
+            true
+        } else {
+            false
         }
     }
 
     #[inline]
-    fn consume_colon(&mut self) -> Option<()> {
+    fn consume_colon(&mut self) -> bool {
         self.scanner.skip_if(b":")
     }
 
@@ -498,23 +512,22 @@ impl<'buffer> HttpPartParser<'buffer> {
 
     #[inline]
     fn consume_eol(&mut self) -> Result<Status<bool>> {
-        match self.scanner.skip_if(b"\r\n") {
-            Some(_) => Ok(Complete(true)),
-            None => match self.scanner.skip_if(b"\n") {
-                Some(_) => Ok(Complete(true)),
-                None => match self.scanner.skip_if(b"\r") {
-                    Some(_) => if self.eof() {
-                        Ok(Incomplete)
-                    } else {
-                        Err(InvalidNewLine.into())
-                    },
-                    None => if self.eof() {
-                        Ok(Incomplete)
-                    } else {
-                        Ok(Complete(false))
-                    },
-                },
-            },
+        if self.scanner.skip_if(b"\r\n") {
+            Ok(Complete(true))
+        } else if self.scanner.skip_if(b"\n") {
+            Ok(Complete(true))
+        } else if self.scanner.skip_if(b"\r") {
+            if self.eof() {
+                Ok(Incomplete)
+            } else {
+                Err(InvalidNewLine.into())
+            }
+        } else {
+            if self.eof() {
+                Ok(Incomplete)
+            } else {
+                Ok(Complete(false))
+            }
         }
     }
 
@@ -623,5 +636,4 @@ mod tests {
             assert!(false);
         }
     }
-
 }
