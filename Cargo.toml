@@ -8,7 +8,10 @@ error-chain = "0.11"
 
 [dev-dependencies]
 httparse = "1.2"
-picohttpparser-sys = "1.0"
+
+[dev-dependencies.picohttpparser-sys]
+version = "1.0"
+default-features = false
 
 [profile.bench]
 lto = true
@@ -16,4 +19,4 @@ codegen-units = 1
 opt-level = 3
 
 [features]
-nightly = []
+nightly = [ "picohttpparser-sys/sse4" ]
