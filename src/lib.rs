@@ -1,4 +1,4 @@
-#![cfg_attr(feature = "nightly", feature(cfg_target_feature, target_feature, stdsimd))]
+#![cfg_attr(feature = "nightly", feature(stdsimd))]
 
 use std::str;
 
