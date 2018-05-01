@@ -8,17 +8,17 @@ use std::arch::x86_64::*;
 use std::simd::*;
 
 #[inline]
-pub fn index_of_range_or_last_16bytes_boundary(buffer: &[u8], range: &[u8]) -> usize {
+pub fn index_of_range_or_last_16bytes_boundary(buffer: &[u8], range: &[u8]) -> (usize, bool) {
     let mut i = 0;
     loop {
         if buffer.len() - i < 16 {
-            return i;
+            return (i, false);
         }
         let v = unsafe { buffer.get_unchecked(i..i + 16) };
         let idx = find_fast(v, range);
-        if idx < 16 {
+        if idx != 16 {
             i += idx;
-            return i;
+            return (i, true);
         }
         i += 16;
     }
@@ -50,35 +50,35 @@ mod tests {
     use simd::*;
 
     macro_rules! check {
-        ($buf:expr, $range:expr, $index:expr) => {
+        ($buf:expr, $range:expr, $index:expr, $found:expr) => {
             let v = index_of_range_or_last_16bytes_boundary($buf, $range);
-            assert_eq!(v, $index);
+            assert_eq!(v, ($index, $found));
         };
     }
 
     #[test]
     fn test_index_of_range_or_last_16bytes_boundary_found() {
-        check!(b"1aaaaaaabbbbbbbb", b"09", 0);
-        check!(b"aaaaaaa1bbbbbbbb", b"09", 7);
-        check!(b"aaaaaaaabbbbbbb1", b"09", 15);
-        check!(b"aaaaaaaabbbbbbbb1cccccccdddddddd", b"09", 16);
-        check!(b"aaaaaaaabbbbbbbbccccccc1dddddddd", b"09", 23);
-        check!(b"aaaaaaaabbbbbbbbccccccccddddddd1", b"09", 31);
+        check!(b"1aaaaaaabbbbbbbb", b"09", 0, true);
+        check!(b"aaaaaaa1bbbbbbbb", b"09", 7, true);
+        check!(b"aaaaaaaabbbbbbb1", b"09", 15, true);
+        check!(b"aaaaaaaabbbbbbbb1cccccccdddddddd", b"09", 16, true);
+        check!(b"aaaaaaaabbbbbbbbccccccc1dddddddd", b"09", 23, true);
+        check!(b"aaaaaaaabbbbbbbbccccccccddddddd1", b"09", 31, true);
     }
 
     #[test]
     fn test_index_of_range_or_last_16bytes_boundary_not_found() {
-        check!(b"aaaaaaaabbbbbbbb", b"09", 16);
-        check!(b"aaaaaaaabbbbbbbbccccccccdddddddd", b"09", 32);
+        check!(b"aaaaaaaabbbbbbbb", b"09", 16, false);
+        check!(b"aaaaaaaabbbbbbbbccccccccdddddddd", b"09", 32, false);
     }
 
     #[test]
     fn test_index_of_range_or_last_16bytes_boundary_returns_last_16bytes_boundary() {
-        check!(b"1aaaaaaabbbbbbb", b"09", 0);
-        check!(b"aaaaaaa1bbbbbbb", b"09", 0);
-        check!(b"aaaaaaaabbbbbb1", b"09", 0);
-        check!(b"aaaaaaaabbbbbbbb1cccccccddddddd", b"09", 16);
-        check!(b"aaaaaaaabbbbbbbbccccccc1ddddddd", b"09", 16);
-        check!(b"aaaaaaaabbbbbbbbccccccccdddddd1", b"09", 16);
+        check!(b"1aaaaaaabbbbbbb", b"09", 0, false);
+        check!(b"aaaaaaa1bbbbbbb", b"09", 0, false);
+        check!(b"aaaaaaaabbbbbb1", b"09", 0, false);
+        check!(b"aaaaaaaabbbbbbbb1cccccccddddddd", b"09", 16, false);
+        check!(b"aaaaaaaabbbbbbbbccccccc1ddddddd", b"09", 16, false);
+        check!(b"aaaaaaaabbbbbbbbccccccccdddddd1", b"09", 16, false);
     }
 }

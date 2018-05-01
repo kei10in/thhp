@@ -57,6 +57,13 @@ impl<'a> Scanner<'a> {
     }
 
     #[inline]
+    unsafe fn read_unchecked(&mut self, count: usize) -> &'a [u8] {
+        let result = self.buffer.get_unchecked(..count);
+        self.buffer = self.buffer.get_unchecked(count..);
+        return result;
+    }
+
+    #[inline]
     pub fn read_while<A>(&mut self, acceptable: A) -> Option<&'a [u8]>
     where
         A: FnMut(u8) -> bool,
@@ -70,8 +77,12 @@ impl<'a> Scanner<'a> {
     where
         A: FnMut(u8) -> bool,
     {
-        let v = simd::index_of_range_or_last_16bytes_boundary(self.buffer, range);
-        return self.read_while_continue_with(v, acceptable);
+        let (v, found) = simd::index_of_range_or_last_16bytes_boundary(self.buffer, range);
+        if found {
+            unsafe { Some(self.read_unchecked(v)) }
+        } else {
+            self.read_while_continue_with(v, acceptable)
+        }
     }
 
     #[inline]
@@ -132,10 +143,7 @@ impl<'a> Scanner<'a> {
         }
 
         debug_assert!(i <= self.buffer.len());
-        let result = unsafe { self.buffer.get_unchecked(..i) };
-        self.buffer = unsafe { self.buffer.get_unchecked(i..) };
-
-        return Some(result);
+        return unsafe { Some(self.read_unchecked(i)) };
     }
 }
 
