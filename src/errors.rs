@@ -25,6 +25,7 @@ impl PartialEq<ErrorKind> for ErrorKind {
             (&InvalidPath, &InvalidPath) => true,
             (&InvalidStatusCode, &InvalidStatusCode) => true,
             (&InvalidReasonPhrase, &InvalidReasonPhrase) => true,
+            (&OutOfCapacity, &OutOfCapacity) => true,
             _ => false,
         }
     }

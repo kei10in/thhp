@@ -452,7 +452,7 @@ impl<'buffer> HttpPartParser<'buffer> {
             }
 
             let header = complete!(self.parse_header_field()?);
-            result.push(header);
+            result.push(header)?;
         }
 
         Ok(Complete(result))
