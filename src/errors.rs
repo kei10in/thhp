@@ -8,6 +8,7 @@ error_chain! {
         InvalidPath
         InvalidStatusCode
         InvalidReasonPhrase
+        OutOfCapacity
     }
 }
 

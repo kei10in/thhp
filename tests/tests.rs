@@ -12,7 +12,7 @@ mod request {
         };
         ($buf:expr, | $req:ident | $body:expr) => {{
             let mut headers = Vec::<HeaderField>::with_capacity(10);
-            match Request::parse($buf, &mut headers) {
+            match Request::<Vec<HeaderField>>::parse($buf, &mut headers) {
                 Ok(Complete((req, c))) => {
                     assert_eq!(c, $buf.len());
                     closure(req);
@@ -20,7 +20,7 @@ mod request {
                 _ => assert!(false),
             }
 
-            fn closure($req: Request) {
+            fn closure<'a, 'b>($req: Request<'a, 'b, Vec<HeaderField<'a>>>) {
                 $body
             }
         }};
@@ -29,7 +29,7 @@ mod request {
     macro_rules! fail {
         ($buf:expr, $err:ident) => {{
             let mut headers = Vec::<HeaderField>::with_capacity(10);
-            let r = Request::parse($buf, &mut headers);
+            let r = Request::<Vec<HeaderField>>::parse($buf, &mut headers);
             assert!(r.is_err());
             assert_eq!(*r.err().unwrap().kind(), $err);
         }};
@@ -74,7 +74,7 @@ mod request {
     macro_rules! incomplete {
         ($buf:expr) => {{
             let mut headers = Vec::<HeaderField>::with_capacity(10);
-            let r = Request::parse($buf, &mut headers);
+            let r = Request::<Vec<HeaderField>>::parse($buf, &mut headers);
             assert!(r.is_ok());
             assert!(r.unwrap().is_incomplete());
         }};
@@ -169,7 +169,7 @@ mod response {
         };
         ($buf:expr, | $res:ident | $body:expr) => {{
             let mut headers = Vec::<HeaderField>::with_capacity(10);
-            match Response::parse($buf, &mut headers) {
+            match Response::<Vec<HeaderField>>::parse($buf, &mut headers) {
                 Ok(Complete((res, c))) => {
                     assert_eq!(c, $buf.len());
                     closure(res);
@@ -177,7 +177,7 @@ mod response {
                 _ => assert!(false),
             }
 
-            fn closure($res: Response) {
+            fn closure<'a, 'b>($res: Response<'a, 'b, Vec<HeaderField<'a>>>) {
                 $body
             }
         }};
@@ -186,7 +186,7 @@ mod response {
     macro_rules! fail {
         ($buf:expr, $err:ident) => {{
             let mut headers = Vec::<HeaderField>::with_capacity(10);
-            let r = Response::parse($buf, &mut headers);
+            let r = Response::<Vec<HeaderField>>::parse($buf, &mut headers);
             assert!(r.is_err());
             assert_eq!(*r.err().unwrap().kind(), $err);
         }};
@@ -213,7 +213,7 @@ mod response {
     macro_rules! incomplete {
         ($buf:expr) => {{
             let mut headers = Vec::<HeaderField>::with_capacity(10);
-            let r = Response::parse($buf, &mut headers);
+            let r = Response::<Vec<HeaderField>>::parse($buf, &mut headers);
             assert!(r.is_ok());
             assert!(r.unwrap().is_incomplete());
         }};

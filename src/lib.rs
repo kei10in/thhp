@@ -8,6 +8,7 @@ extern crate error_chain;
 mod errors;
 mod scanner;
 mod simd;
+mod vec;
 
 pub use errors::*;
 use scanner::Scanner;
@@ -52,21 +53,26 @@ macro_rules! complete {
     };
 }
 
-pub struct Request<'buffer, 'header>
+pub struct Request<'buffer, 'header, Headers>
 where
     'buffer: 'header,
+    Headers: 'header + HeaderFieldCollection<'buffer>,
 {
     pub method: &'buffer str,
     pub target: &'buffer str,
     pub minor_version: u8,
-    pub headers: &'header Vec<HeaderField<'buffer>>,
+    pub headers: &'header Headers,
 }
 
-impl<'buffer, 'header> Request<'buffer, 'header> {
+impl<'buffer, 'header, Headers> Request<'buffer, 'header, Headers>
+where
+    'buffer: 'header,
+    Headers: 'header + HeaderFieldCollection<'buffer>,
+{
     pub fn parse(
         buf: &'buffer [u8],
-        headers: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<Status<(Request<'buffer, 'header>, usize)>> {
+        headers: &'header mut Headers,
+    ) -> Result<Status<(Self, usize)>> {
         let mut parser = HttpPartParser::new(buf);
         Ok(Complete((
             complete!(parser.parse_request(headers)?),
@@ -75,21 +81,26 @@ impl<'buffer, 'header> Request<'buffer, 'header> {
     }
 }
 
-pub struct Response<'buffer, 'header>
+pub struct Response<'buffer, 'header, Headers>
 where
     'buffer: 'header,
+    Headers: 'header + HeaderFieldCollection<'buffer>,
 {
     pub minor_version: u8,
     pub status: u16,
     pub reason: &'buffer str,
-    pub headers: &'header Vec<HeaderField<'buffer>>,
+    pub headers: &'header Headers,
 }
 
-impl<'buffer, 'header> Response<'buffer, 'header> {
+impl<'buffer, 'header, Headers> Response<'buffer, 'header, Headers>
+where
+    'buffer: 'header,
+    Headers: 'header + HeaderFieldCollection<'buffer>,
+{
     pub fn parse(
         buf: &'buffer [u8],
-        headers: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<Status<(Response<'buffer, 'header>, usize)>> {
+        headers: &'header mut Headers,
+    ) -> Result<Status<(Self, usize)>> {
         let mut parser = HttpPartParser::new(buf);
         Ok(Complete((
             complete!(parser.parse_response(headers)?),
@@ -101,6 +112,10 @@ impl<'buffer, 'header> Response<'buffer, 'header> {
 pub struct HeaderField<'buffer> {
     pub name: &'buffer str,
     pub value: &'buffer str,
+}
+
+pub trait HeaderFieldCollection<'buffer> {
+    fn push(&mut self, header_field: HeaderField<'buffer>) -> Result<()>;
 }
 
 macro_rules! make_bool_table {
@@ -260,12 +275,16 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn parse_request<'header>(
+    fn parse_request<'header, Headers>(
         &mut self,
-        headers: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<Status<Request<'buffer, 'header>>> {
+        headers: &'header mut Headers,
+    ) -> Result<Status<Request<'buffer, 'header, Headers>>>
+    where
+        'buffer: 'header,
+        Headers: 'header + HeaderFieldCollection<'buffer>,
+    {
         complete!(self.skip_empty_lines()?);
-        Ok(Complete(Request::<'buffer, 'header> {
+        Ok(Complete(Request::<'buffer, 'header, Headers> {
             method: complete!(self.parse_request_method()?),
             target: complete!(self.parse_request_target()?),
             minor_version: complete!(self.parse_request_http_version()?),
@@ -274,12 +293,16 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn parse_response<'header>(
+    fn parse_response<'header, Headers>(
         &mut self,
-        headers: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<Status<Response<'buffer, 'header>>> {
+        headers: &'header mut Headers,
+    ) -> Result<Status<Response<'buffer, 'header, Headers>>>
+    where
+        'buffer: 'header,
+        Headers: 'header + HeaderFieldCollection<'buffer>,
+    {
         complete!(self.skip_empty_lines()?);
-        Ok(Complete(Response::<'buffer, 'header> {
+        Ok(Complete(Response::<'buffer, 'header, Headers> {
             minor_version: complete!(self.parse_response_http_version()?),
             status: complete!(self.parse_response_status_code()?),
             reason: complete!(self.parse_response_reason_phrase()?),
@@ -415,10 +438,14 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn parse_headers<'header>(
+    fn parse_headers<'header, Headers>(
         &mut self,
-        result: &'header mut Vec<HeaderField<'buffer>>,
-    ) -> Result<Status<(&'header mut Vec<HeaderField<'buffer>>)>> {
+        result: &'header mut Headers,
+    ) -> Result<Status<(&'header mut Headers)>>
+    where
+        'buffer: 'header,
+        Headers: 'header + HeaderFieldCollection<'buffer>,
+    {
         loop {
             if complete!(self.skip_eol()?) {
                 break;
