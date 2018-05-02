@@ -220,7 +220,7 @@ mod response {
     }
 
     #[test]
-    fn simple_request() {
+    fn simple_response() {
         good!(b"HTTP/1.1 200 OK\r\n\r\n", |res| {
             assert_eq!(res.minor_version, 1);
             assert_eq!(res.status, 200);
@@ -230,7 +230,7 @@ mod response {
     }
 
     #[test]
-    fn simple_request_with_headers() {
+    fn simple_response_with_headers() {
         good!(b"HTTP/1.1 200 OK\r\na:b\r\nc:d\r\n\r\n", |res| {
             assert_eq!(res.minor_version, 1);
             assert_eq!(res.status, 200);
@@ -262,7 +262,7 @@ mod response {
     }
 
     #[test]
-    fn bad_request() {
+    fn bad_response() {
         invalid_version!(b"HOGE/1.1 200 OK\r\n\r\n");
         invalid_version!(b"HTTP/11.1 200 OK\r\n\r\n");
         invalid_version!(b"HTTP/A.1 200 OK\r\n\r\n");
@@ -277,7 +277,7 @@ mod response {
     }
 
     #[test]
-    fn incomplete_request() {
+    fn incomplete_response() {
         incomplete!(b"");
         incomplete!(b"HTT");
         incomplete!(b"HTTP/");
