@@ -4,76 +4,80 @@ use thhp::*;
 
 #[cfg(test)]
 mod request {
-    use ::*;
+    use *;
 
     macro_rules! good {
-        ($buf: expr) => {
+        ($buf:expr) => {
             good!($buf, |_req| {})
         };
-        ($buf: expr, |$req: ident| $body: expr) => {
-            {
-                let mut headers = Vec::<HeaderField>::with_capacity(10);
-                match Request::parse($buf, &mut headers) {
-                    Ok(Complete((req, c))) => {
-                        assert_eq!(c, $buf.len());
-                        closure(req);
-                    },
-                    _ => {
-                        assert!(false)
-                    }
+        ($buf:expr, | $req:ident | $body:expr) => {{
+            let mut headers = Vec::<HeaderField>::with_capacity(10);
+            match Request::parse($buf, &mut headers) {
+                Ok(Complete((req, c))) => {
+                    assert_eq!(c, $buf.len());
+                    closure(req);
                 }
-
-                fn closure($req: Request) {
-                    $body
-                }
+                _ => assert!(false),
             }
-        }
+
+            fn closure($req: Request) {
+                $body
+            }
+        }};
     }
 
     macro_rules! fail {
-        ($buf: expr, $err: ident) => {
-            {
-                let mut headers = Vec::<HeaderField>::with_capacity(10);
-                let r = Request::parse($buf, &mut headers);
-                assert!(r.is_err());
-                assert_eq!(*r.err().unwrap().kind(), $err);
-            }
-        }
+        ($buf:expr, $err:ident) => {{
+            let mut headers = Vec::<HeaderField>::with_capacity(10);
+            let r = Request::parse($buf, &mut headers);
+            assert!(r.is_err());
+            assert_eq!(*r.err().unwrap().kind(), $err);
+        }};
     }
 
     macro_rules! invalid_method {
-        ($parse: expr) => { fail!($parse, InvalidMethod) }
+        ($parse:expr) => {
+            fail!($parse, InvalidMethod)
+        };
     }
 
     macro_rules! invalid_path {
-        ($parse: expr) => { fail!($parse, InvalidPath) }
+        ($parse:expr) => {
+            fail!($parse, InvalidPath)
+        };
     }
 
     macro_rules! invalid_version {
-        ($parse: expr) => { fail!($parse, InvalidVersion) }
+        ($parse:expr) => {
+            fail!($parse, InvalidVersion)
+        };
     }
 
     macro_rules! invalid_field_name {
-        ($parse: expr) => { fail!($parse, InvalidFieldName) }
+        ($parse:expr) => {
+            fail!($parse, InvalidFieldName)
+        };
     }
 
     macro_rules! invalid_field_value {
-        ($parse: expr) => { fail!($parse, InvalidFieldValue) }
+        ($parse:expr) => {
+            fail!($parse, InvalidFieldValue)
+        };
     }
 
     macro_rules! invalid_new_line {
-        ($parse: expr) => { fail!($parse, InvalidNewLine) }
+        ($parse:expr) => {
+            fail!($parse, InvalidNewLine)
+        };
     }
 
     macro_rules! incomplete {
-        ($buf: expr) => {
-            {
-                let mut headers = Vec::<HeaderField>::with_capacity(10);
-                let r = Request::parse($buf, &mut headers);
-                assert!(r.is_ok());
-                assert!(r.unwrap().is_incomplete());
-            }
-        }
+        ($buf:expr) => {{
+            let mut headers = Vec::<HeaderField>::with_capacity(10);
+            let r = Request::parse($buf, &mut headers);
+            assert!(r.is_ok());
+            assert!(r.unwrap().is_incomplete());
+        }};
     }
 
     #[test]
@@ -157,62 +161,62 @@ mod request {
 
 #[cfg(test)]
 mod response {
-    use ::*;
+    use *;
 
     macro_rules! good {
-        ($buf: expr) => {
+        ($buf:expr) => {
             good!($buf, |_res| {})
         };
-        ($buf: expr, |$res: ident| $body: expr) => {
-            {
-                let mut headers = Vec::<HeaderField>::with_capacity(10);
-                match Response::parse($buf, &mut headers) {
-                    Ok(Complete((res, c))) => {
-                        assert_eq!(c, $buf.len());
-                        closure(res);
-                    }
-                    _ => assert!(false),
+        ($buf:expr, | $res:ident | $body:expr) => {{
+            let mut headers = Vec::<HeaderField>::with_capacity(10);
+            match Response::parse($buf, &mut headers) {
+                Ok(Complete((res, c))) => {
+                    assert_eq!(c, $buf.len());
+                    closure(res);
                 }
-
-                fn closure($res: Response) {
-                    $body
-                }
+                _ => assert!(false),
             }
-        }
+
+            fn closure($res: Response) {
+                $body
+            }
+        }};
     }
 
     macro_rules! fail {
-        ($buf: expr, $err: ident) => {
-            {
-                let mut headers = Vec::<HeaderField>::with_capacity(10);
-                let r = Response::parse($buf, &mut headers);
-                assert!(r.is_err());
-                assert_eq!(*r.err().unwrap().kind(), $err);
-            }
-        }
+        ($buf:expr, $err:ident) => {{
+            let mut headers = Vec::<HeaderField>::with_capacity(10);
+            let r = Response::parse($buf, &mut headers);
+            assert!(r.is_err());
+            assert_eq!(*r.err().unwrap().kind(), $err);
+        }};
     }
 
     macro_rules! invalid_version {
-        ($parse: expr) => { fail!($parse, InvalidVersion) }
+        ($parse:expr) => {
+            fail!($parse, InvalidVersion)
+        };
     }
 
     macro_rules! invalid_status_code {
-        ($parse: expr) => { fail!($parse, InvalidStatusCode) }
+        ($parse:expr) => {
+            fail!($parse, InvalidStatusCode)
+        };
     }
 
     macro_rules! invalid_reason_phrase {
-        ($parse: expr) => { fail!($parse, InvalidReasonPhrase) }
+        ($parse:expr) => {
+            fail!($parse, InvalidReasonPhrase)
+        };
     }
 
     macro_rules! incomplete {
-        ($buf: expr) => {
-            {
-                let mut headers = Vec::<HeaderField>::with_capacity(10);
-                let r = Response::parse($buf, &mut headers);
-                assert!(r.is_ok());
-                assert!(r.unwrap().is_incomplete());
-            }
-        }
+        ($buf:expr) => {{
+            let mut headers = Vec::<HeaderField>::with_capacity(10);
+            let r = Response::parse($buf, &mut headers);
+            assert!(r.is_ok());
+            assert!(r.unwrap().is_incomplete());
+        }};
     }
 
     #[test]
