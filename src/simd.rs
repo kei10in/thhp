@@ -5,10 +5,42 @@
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
+use std::convert::*;
 use std::simd::*;
 
+pub struct CharRanges {
+    value: u8x16,
+    len: i32,
+}
+
+impl<'a> Into<CharRanges> for &'a [u8; 2] {
+    fn into(self) -> CharRanges {
+        let x0 = self[0];
+        let x1 = self[1];
+        CharRanges {
+            value: u8x16::new(x0, x1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            len: 2,
+        }
+    }
+}
+
+impl<'a> Into<CharRanges> for &'a [u8; 6] {
+    fn into(self) -> CharRanges {
+        let x0 = self[0];
+        let x1 = self[1];
+        let x2 = self[2];
+        let x3 = self[3];
+        let x4 = self[4];
+        let x5 = self[5];
+        CharRanges {
+            value: u8x16::new(x0, x1, x2, x3, x4, x5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            len: 6,
+        }
+    }
+}
+
 #[inline]
-pub fn index_of_range_or_last_16bytes_boundary(buffer: &[u8], range: &[u8]) -> (usize, bool) {
+pub fn index_of_range_or_last_16bytes_boundary(buffer: &[u8], range: &CharRanges) -> (usize, bool) {
     let mut i = 0;
     loop {
         if buffer.len() - i < 16 {
@@ -25,17 +57,16 @@ pub fn index_of_range_or_last_16bytes_boundary(buffer: &[u8], range: &[u8]) -> (
 }
 
 #[inline]
-fn find_fast(buffer: &[u8], range: &[u8]) -> usize {
+fn find_fast(buffer: &[u8], range: &CharRanges) -> usize {
     debug_assert!(buffer.len() <= 16);
-    debug_assert!(range.len() <= 16);
 
     unsafe {
-        let a = __m128i::from_bits(u8x16::load_unaligned_unchecked(range));
+        let a = __m128i::from_bits(range.value);
         let b = __m128i::from_bits(u8x16::load_unaligned_unchecked(buffer));
 
         let i = _mm_cmpestri(
             a,
-            range.len() as i32,
+            range.len,
             b,
             buffer.len() as i32,
             _SIDD_UBYTE_OPS | _SIDD_CMP_RANGES | _SIDD_LEAST_SIGNIFICANT,
@@ -51,7 +82,7 @@ mod tests {
 
     macro_rules! check {
         ($buf:expr, $range:expr, $index:expr, $found:expr) => {
-            let v = index_of_range_or_last_16bytes_boundary($buf, $range);
+            let v = index_of_range_or_last_16bytes_boundary($buf, &$range.into());
             assert_eq!(v, ($index, $found));
         };
     }

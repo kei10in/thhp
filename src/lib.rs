@@ -472,8 +472,9 @@ impl<'buffer> HttpPartParser<'buffer> {
         #[cfg(feature = "nightly")]
         {
             if is_x86_feature_detected!("sse4.2") {
+                let range = b"\x00\x08\x0A\x1F\x7F\xFF".into();
                 return self.scanner
-                    .read_while_fast(b"\x00\x08\x0A\x1F\x7F\xFF", |x| is_field_value_char(x));
+                    .read_while_fast(&range, |x| is_field_value_char(x));
             } else {
                 return self.scanner.read_while(|x| is_field_value_char(x));
             }

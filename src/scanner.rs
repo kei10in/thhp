@@ -1,6 +1,9 @@
 #[cfg(feature = "nightly")]
 use simd;
 
+#[cfg(feature = "nightly")]
+pub use simd::CharRanges;
+
 pub struct Scanner<'a> {
     buffer: &'a [u8],
 }
@@ -73,7 +76,7 @@ impl<'a> Scanner<'a> {
 
     #[cfg(feature = "nightly")]
     #[inline]
-    pub fn read_while_fast<A>(&mut self, range: &[u8], acceptable: A) -> Option<&'a [u8]>
+    pub fn read_while_fast<A>(&mut self, range: &CharRanges, acceptable: A) -> Option<&'a [u8]>
     where
         A: FnMut(u8) -> bool,
     {
@@ -205,7 +208,7 @@ mod tests {
         macro_rules! check {
             ($buf:expr, $expect:expr) => {
                 let mut s = Scanner::new($buf);
-                let r = s.read_while_fast(b";;", |x| x != b';');
+                let r = s.read_while_fast(&b";;".into(), |x| x != b';');
                 assert_eq!(r, $expect);
             };
         }
