@@ -8,7 +8,7 @@ extern crate error_chain;
 mod errors;
 mod scanner;
 mod simd;
-mod vec;
+mod vec_header;
 
 pub use errors::*;
 use scanner::Scanner;
