@@ -2,10 +2,12 @@
 
 use std::str;
 
+#[cfg(feature = "arrayvec")]
 extern crate arrayvec;
 #[macro_use]
 extern crate error_chain;
 
+#[cfg(feature = "arrayvec")]
 mod arrayvec_header;
 mod errors;
 mod scanner;

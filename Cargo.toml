@@ -4,8 +4,11 @@ version = "0.1.0"
 authors = ["kei10in <kei10in@gmail.com>"]
 
 [dependencies]
-arrayvec = "0.4"
 error-chain = "0.11"
+
+[dependencies.arrayvec]
+version = "0.4"
+optional = true
 
 [dev-dependencies]
 httparse = "1.2"
