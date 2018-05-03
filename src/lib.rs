@@ -2,9 +2,11 @@
 
 use std::str;
 
+extern crate arrayvec;
 #[macro_use]
 extern crate error_chain;
 
+mod arrayvec_header;
 mod errors;
 mod scanner;
 mod simd;
