@@ -8,6 +8,7 @@ error_chain! {
         InvalidPath
         InvalidStatusCode
         InvalidReasonPhrase
+        OutOfCapacity
     }
 }
 
@@ -24,6 +25,7 @@ impl PartialEq<ErrorKind> for ErrorKind {
             (&InvalidPath, &InvalidPath) => true,
             (&InvalidStatusCode, &InvalidStatusCode) => true,
             (&InvalidReasonPhrase, &InvalidReasonPhrase) => true,
+            (&OutOfCapacity, &OutOfCapacity) => true,
             _ => false,
         }
     }

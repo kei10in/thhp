@@ -6,6 +6,10 @@ authors = ["kei10in <kei10in@gmail.com>"]
 [dependencies]
 error-chain = "0.11"
 
+[dependencies.arrayvec]
+version = "0.4"
+optional = true
+
 [dev-dependencies]
 httparse = "1.2"
 

@@ -12,7 +12,7 @@ mod request {
         };
         ($buf:expr, | $req:ident | $body:expr) => {{
             let mut headers = Vec::<HeaderField>::with_capacity(10);
-            match Request::parse($buf, &mut headers) {
+            match Request::<Vec<HeaderField>>::parse($buf, &mut headers) {
                 Ok(Complete((req, c))) => {
                     assert_eq!(c, $buf.len());
                     closure(req);
@@ -20,7 +20,7 @@ mod request {
                 _ => assert!(false),
             }
 
-            fn closure($req: Request) {
+            fn closure<'a, 'b>($req: Request<'a, 'b, Vec<HeaderField<'a>>>) {
                 $body
             }
         }};
@@ -28,8 +28,8 @@ mod request {
 
     macro_rules! fail {
         ($buf:expr, $err:ident) => {{
-            let mut headers = Vec::<HeaderField>::with_capacity(10);
-            let r = Request::parse($buf, &mut headers);
+            let mut headers = Vec::<HeaderField>::with_capacity(1);
+            let r = Request::<Vec<HeaderField>>::parse($buf, &mut headers);
             assert!(r.is_err());
             assert_eq!(*r.err().unwrap().kind(), $err);
         }};
@@ -71,10 +71,16 @@ mod request {
         };
     }
 
+    macro_rules! out_of_capacity {
+        ($parse:expr) => {
+            fail!($parse, OutOfCapacity)
+        };
+    }
+
     macro_rules! incomplete {
         ($buf:expr) => {{
             let mut headers = Vec::<HeaderField>::with_capacity(10);
-            let r = Request::parse($buf, &mut headers);
+            let r = Request::<Vec<HeaderField>>::parse($buf, &mut headers);
             assert!(r.is_ok());
             assert!(r.unwrap().is_incomplete());
         }};
@@ -136,6 +142,7 @@ mod request {
         invalid_new_line!(b"GET / HTTP/1.1\r\nabc:xyz\ra\n\r\n");
         invalid_new_line!(b"GET / HTTP/1.1\r\nabc:xyz\r\n\ra\n");
         invalid_new_line!(b"\rGET / HTTP/1.1\r\n\r\n");
+        out_of_capacity!(b"GET / HTTP/1.1\r\na:b\r\nc:d\r\n\r\n");
     }
 
     #[test]
@@ -169,7 +176,7 @@ mod response {
         };
         ($buf:expr, | $res:ident | $body:expr) => {{
             let mut headers = Vec::<HeaderField>::with_capacity(10);
-            match Response::parse($buf, &mut headers) {
+            match Response::<Vec<HeaderField>>::parse($buf, &mut headers) {
                 Ok(Complete((res, c))) => {
                     assert_eq!(c, $buf.len());
                     closure(res);
@@ -177,7 +184,7 @@ mod response {
                 _ => assert!(false),
             }
 
-            fn closure($res: Response) {
+            fn closure<'a, 'b>($res: Response<'a, 'b, Vec<HeaderField<'a>>>) {
                 $body
             }
         }};
@@ -185,8 +192,8 @@ mod response {
 
     macro_rules! fail {
         ($buf:expr, $err:ident) => {{
-            let mut headers = Vec::<HeaderField>::with_capacity(10);
-            let r = Response::parse($buf, &mut headers);
+            let mut headers = Vec::<HeaderField>::with_capacity(1);
+            let r = Response::<Vec<HeaderField>>::parse($buf, &mut headers);
             assert!(r.is_err());
             assert_eq!(*r.err().unwrap().kind(), $err);
         }};
@@ -210,10 +217,16 @@ mod response {
         };
     }
 
+    macro_rules! out_of_capacity {
+        ($parse:expr) => {
+            fail!($parse, OutOfCapacity)
+        };
+    }
+
     macro_rules! incomplete {
         ($buf:expr) => {{
             let mut headers = Vec::<HeaderField>::with_capacity(10);
-            let r = Response::parse($buf, &mut headers);
+            let r = Response::<Vec<HeaderField>>::parse($buf, &mut headers);
             assert!(r.is_ok());
             assert!(r.unwrap().is_incomplete());
         }};
@@ -274,6 +287,7 @@ mod response {
         invalid_reason_phrase!(b"HTTP/1.1 200 O\x01K\r\na:b\r\n\r\n");
         invalid_reason_phrase!(b"HTTP/1.1 200 O\x01K\r\na:b\r\n\r\n");
         invalid_reason_phrase!(b"HTTP/1.1 200 O\x01K\r\na\x01:b\r\n\r\n");
+        out_of_capacity!(b"HTTP/1.1 200 OK\r\na:b\r\nc:d\r\n\r\n");
     }
 
     #[test]
