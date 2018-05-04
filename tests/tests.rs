@@ -31,7 +31,7 @@ mod request {
             let mut headers = Vec::<HeaderField>::with_capacity(1);
             let r = Request::<Vec<HeaderField>>::parse($buf, &mut headers);
             assert!(r.is_err());
-            assert_eq!(*r.err().unwrap().kind(), $err);
+            assert_eq!(r.err().unwrap(), $err);
         }};
     }
 
@@ -195,7 +195,7 @@ mod response {
             let mut headers = Vec::<HeaderField>::with_capacity(1);
             let r = Response::<Vec<HeaderField>>::parse($buf, &mut headers);
             assert!(r.is_err());
-            assert_eq!(*r.err().unwrap().kind(), $err);
+            assert_eq!(r.err().unwrap(), $err);
         }};
     }
 

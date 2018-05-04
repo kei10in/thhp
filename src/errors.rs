@@ -1,32 +1,44 @@
-error_chain! {
-    errors {
-        InvalidFieldName
-        InvalidFieldValue
-        InvalidNewLine
-        InvalidVersion
-        InvalidMethod
-        InvalidPath
-        InvalidStatusCode
-        InvalidReasonPhrase
-        OutOfCapacity
-    }
+#[derive(Debug, Hash, PartialEq)]
+pub enum Error {
+    InvalidFieldName,
+    InvalidFieldValue,
+    InvalidNewLine,
+    InvalidVersion,
+    InvalidMethod,
+    InvalidPath,
+    InvalidStatusCode,
+    InvalidReasonPhrase,
+    OutOfCapacity,
 }
 
-pub use ErrorKind::*;
+pub use Error::*;
 
-impl PartialEq<ErrorKind> for ErrorKind {
-    fn eq(&self, other: &ErrorKind) -> bool {
-        match (self, other) {
-            (&InvalidFieldName, &InvalidFieldName) => true,
-            (&InvalidFieldValue, &InvalidFieldValue) => true,
-            (&InvalidNewLine, &InvalidNewLine) => true,
-            (&InvalidVersion, &InvalidVersion) => true,
-            (&InvalidMethod, &InvalidMethod) => true,
-            (&InvalidPath, &InvalidPath) => true,
-            (&InvalidStatusCode, &InvalidStatusCode) => true,
-            (&InvalidReasonPhrase, &InvalidReasonPhrase) => true,
-            (&OutOfCapacity, &OutOfCapacity) => true,
-            _ => false,
+impl Error {
+    pub fn as_str(&self) -> &'static str {
+        match *self {
+            InvalidFieldName => "InvalidFieldName",
+            InvalidFieldValue => "InvalidFieldValue",
+            InvalidNewLine => "InvalidNewLine",
+            InvalidVersion => "InvalidVersion",
+            InvalidMethod => "InvalidMethod",
+            InvalidPath => "InvalidPath",
+            InvalidStatusCode => "InvalidStatusCode",
+            InvalidReasonPhrase => "InvalidReasonPhrase",
+            OutOfCapacity => "OutOfCapacity",
         }
     }
 }
+
+impl ::std::fmt::Display for Error {
+    fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(fmt, "{:?}", self.as_str())
+    }
+}
+
+impl ::std::error::Error for Error {
+    fn description(&self) -> &str {
+        self.as_str()
+    }
+}
+
+pub type Result<T> = ::std::result::Result<T, Error>;

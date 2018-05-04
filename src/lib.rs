@@ -4,8 +4,6 @@ use std::str;
 
 #[cfg(feature = "arrayvec")]
 extern crate arrayvec;
-#[macro_use]
-extern crate error_chain;
 
 #[cfg(feature = "arrayvec")]
 mod arrayvec_header;
@@ -326,7 +324,7 @@ impl<'buffer> HttpPartParser<'buffer> {
                 if self.consume_space() {
                     Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
                 } else {
-                    Err(InvalidMethod.into())
+                    Err(InvalidMethod)
                 }
             }
             None => Ok(Incomplete),
@@ -340,7 +338,7 @@ impl<'buffer> HttpPartParser<'buffer> {
                 if self.consume_space() {
                     Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
                 } else {
-                    Err(InvalidPath.into())
+                    Err(InvalidPath)
                 }
             }
             None => Ok(Incomplete),
@@ -354,7 +352,7 @@ impl<'buffer> HttpPartParser<'buffer> {
                 if complete!(self.consume_eol()?) {
                     Ok(Complete(v))
                 } else {
-                    Err(InvalidVersion.into())
+                    Err(InvalidVersion)
                 }
             }
             v => v,
@@ -371,7 +369,7 @@ impl<'buffer> HttpPartParser<'buffer> {
                     if self.consume_space() {
                         Ok(Complete(v))
                     } else {
-                        Err(InvalidVersion.into())
+                        Err(InvalidVersion)
                     }
                 }
             }
@@ -387,12 +385,12 @@ impl<'buffer> HttpPartParser<'buffer> {
                     unsafe { str::from_utf8_unchecked(v) }
                         .parse::<u16>()
                         .map(|x| Complete(x))
-                        .or(Err(InvalidStatusCode.into()))
+                        .or(Err(InvalidStatusCode))
                 } else {
-                    Err(InvalidStatusCode.into())
+                    Err(InvalidStatusCode)
                 }
             } else {
-                Err(InvalidStatusCode.into())
+                Err(InvalidStatusCode)
             },
             None => Ok(Incomplete),
         }
@@ -405,7 +403,7 @@ impl<'buffer> HttpPartParser<'buffer> {
                 if complete!(self.consume_eol()?) {
                     Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
                 } else {
-                    Err(InvalidReasonPhrase.into())
+                    Err(InvalidReasonPhrase)
                 }
             }
             None => Ok(Incomplete),
@@ -426,10 +424,10 @@ impl<'buffer> HttpPartParser<'buffer> {
                     let c = http.get_unchecked(7);
                     match to_digit(*c) {
                         Some(v) => Ok(Complete(v)),
-                        None => Err(InvalidVersion.into()),
+                        None => Err(InvalidVersion),
                     }
                 } else {
-                    Err(InvalidVersion.into())
+                    Err(InvalidVersion)
                 }
             }
         } else if self.scanner.empty() {
@@ -437,7 +435,7 @@ impl<'buffer> HttpPartParser<'buffer> {
         } else if self.scanner.is_head_of(b"HTTP/1.") {
             Ok(Incomplete)
         } else {
-            Err(InvalidVersion.into())
+            Err(InvalidVersion)
         }
     }
 
@@ -477,7 +475,7 @@ impl<'buffer> HttpPartParser<'buffer> {
                 if self.consume_name_value_separator() {
                     Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
                 } else {
-                    Err(InvalidFieldName.into())
+                    Err(InvalidFieldName)
                 }
             }
             None => Ok(Incomplete),
@@ -491,7 +489,7 @@ impl<'buffer> HttpPartParser<'buffer> {
                 if complete!(self.consume_eol()?) {
                     Ok(Complete(unsafe { str::from_utf8_unchecked(v) }))
                 } else {
-                    Err(InvalidFieldValue.into())
+                    Err(InvalidFieldValue)
                 }
             }
             None => Ok(Incomplete),
@@ -552,7 +550,7 @@ impl<'buffer> HttpPartParser<'buffer> {
             if self.eof() {
                 Ok(Incomplete)
             } else {
-                Err(InvalidNewLine.into())
+                Err(InvalidNewLine)
             }
         } else {
             if self.eof() {
@@ -571,7 +569,7 @@ impl<'buffer> HttpPartParser<'buffer> {
                     unsafe { self.scanner.skip_unchecked(2) };
                     Ok(Complete(true))
                 }
-                Some(_) => Err(InvalidNewLine.into()),
+                Some(_) => Err(InvalidNewLine),
                 None => Ok(Incomplete),
             },
             Some(&b'\n') => {
