@@ -16,15 +16,15 @@ pub use Error::*;
 impl Error {
     pub fn as_str(&self) -> &'static str {
         match *self {
-            InvalidFieldName => "InvalidFieldName",
-            InvalidFieldValue => "InvalidFieldValue",
-            InvalidNewLine => "InvalidNewLine",
-            InvalidVersion => "InvalidVersion",
-            InvalidMethod => "InvalidMethod",
-            InvalidPath => "InvalidPath",
-            InvalidStatusCode => "InvalidStatusCode",
-            InvalidReasonPhrase => "InvalidReasonPhrase",
-            OutOfCapacity => "OutOfCapacity",
+            InvalidFieldName => "invalid field name",
+            InvalidFieldValue => "invalid field value",
+            InvalidNewLine => "invalid new line",
+            InvalidVersion => "invalid version",
+            InvalidMethod => "invalid method",
+            InvalidPath => "invalid path",
+            InvalidStatusCode => "invalid status code",
+            InvalidReasonPhrase => "invalid reason phrase",
+            OutOfCapacity => "out of capacity",
         }
     }
 }
