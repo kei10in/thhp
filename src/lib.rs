@@ -1,6 +1,14 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), feature(alloc))]
 #![cfg_attr(feature = "nightly", feature(stdsimd))]
 
+#[cfg(not(feature = "std"))]
+extern crate core as std;
+
 use std::str;
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 
 #[cfg(feature = "arrayvec")]
 extern crate arrayvec;
@@ -593,6 +601,9 @@ impl<'buffer> HttpPartParser<'buffer> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(feature = "std"))]
+    use alloc::vec::Vec;
+
     use *;
 
     #[test]

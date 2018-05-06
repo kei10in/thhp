@@ -35,6 +35,7 @@ impl ::std::fmt::Display for Error {
     }
 }
 
+#[cfg(feature = "std")]
 impl ::std::error::Error for Error {
     fn description(&self) -> &str {
         self.as_str()

@@ -1,5 +1,7 @@
-use errors::*;
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
+use errors::*;
 use HeaderField;
 use HeaderFieldCollection;
 
