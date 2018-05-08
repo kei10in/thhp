@@ -63,25 +63,23 @@ macro_rules! complete {
     };
 }
 
-pub struct Request<'buffer, 'header, Headers>
+pub struct Request<'headers, 'buffer: 'headers, Headers>
 where
-    'buffer: 'header,
-    Headers: 'header + HeaderFieldCollection<'buffer>,
+    Headers: 'headers + HeaderFieldCollection<'buffer>,
 {
     pub method: &'buffer str,
     pub target: &'buffer str,
     pub minor_version: u8,
-    pub headers: &'header Headers,
+    pub headers: &'headers Headers,
 }
 
-impl<'buffer, 'header, Headers> Request<'buffer, 'header, Headers>
+impl<'headers, 'buffer: 'headers, Headers> Request<'headers, 'buffer, Headers>
 where
-    'buffer: 'header,
-    Headers: 'header + HeaderFieldCollection<'buffer>,
+    Headers: 'headers + HeaderFieldCollection<'buffer>,
 {
     pub fn parse(
         buf: &'buffer [u8],
-        headers: &'header mut Headers,
+        headers: &'headers mut Headers,
     ) -> Result<Status<(Self, usize)>> {
         let mut parser = HttpPartParser::new(buf);
         Ok(Complete((
@@ -91,25 +89,23 @@ where
     }
 }
 
-pub struct Response<'buffer, 'header, Headers>
+pub struct Response<'headers, 'buffer: 'headers, Headers>
 where
-    'buffer: 'header,
-    Headers: 'header + HeaderFieldCollection<'buffer>,
+    Headers: 'headers + HeaderFieldCollection<'buffer>,
 {
     pub minor_version: u8,
     pub status: u16,
     pub reason: &'buffer str,
-    pub headers: &'header Headers,
+    pub headers: &'headers Headers,
 }
 
-impl<'buffer, 'header, Headers> Response<'buffer, 'header, Headers>
+impl<'headers, 'buffer: 'headers, Headers> Response<'headers, 'buffer, Headers>
 where
-    'buffer: 'header,
-    Headers: 'header + HeaderFieldCollection<'buffer>,
+    Headers: 'headers + HeaderFieldCollection<'buffer>,
 {
     pub fn parse(
         buf: &'buffer [u8],
-        headers: &'header mut Headers,
+        headers: &'headers mut Headers,
     ) -> Result<Status<(Self, usize)>> {
         let mut parser = HttpPartParser::new(buf);
         Ok(Complete((
@@ -285,16 +281,15 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn parse_request<'header, Headers>(
+    fn parse_request<'headers, Headers>(
         &mut self,
-        headers: &'header mut Headers,
-    ) -> Result<Status<Request<'buffer, 'header, Headers>>>
+        headers: &'headers mut Headers,
+    ) -> Result<Status<Request<'headers, 'buffer, Headers>>>
     where
-        'buffer: 'header,
-        Headers: 'header + HeaderFieldCollection<'buffer>,
+        Headers: 'headers + HeaderFieldCollection<'buffer>,
     {
         complete!(self.skip_empty_lines()?);
-        Ok(Complete(Request::<'buffer, 'header, Headers> {
+        Ok(Complete(Request::<'headers, 'buffer, Headers> {
             method: complete!(self.parse_request_method()?),
             target: complete!(self.parse_request_target()?),
             minor_version: complete!(self.parse_request_http_version()?),
@@ -303,16 +298,15 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn parse_response<'header, Headers>(
+    fn parse_response<'headers, Headers>(
         &mut self,
-        headers: &'header mut Headers,
-    ) -> Result<Status<Response<'buffer, 'header, Headers>>>
+        headers: &'headers mut Headers,
+    ) -> Result<Status<Response<'headers, 'buffer, Headers>>>
     where
-        'buffer: 'header,
-        Headers: 'header + HeaderFieldCollection<'buffer>,
+        Headers: 'headers + HeaderFieldCollection<'buffer>,
     {
         complete!(self.skip_empty_lines()?);
-        Ok(Complete(Response::<'buffer, 'header, Headers> {
+        Ok(Complete(Response::<'headers, 'buffer, Headers> {
             minor_version: complete!(self.parse_response_http_version()?),
             status: complete!(self.parse_response_status_code()?),
             reason: complete!(self.parse_response_reason_phrase()?),
@@ -448,13 +442,12 @@ impl<'buffer> HttpPartParser<'buffer> {
     }
 
     #[inline]
-    fn parse_headers<'header, Headers>(
+    fn parse_headers<'headers, Headers>(
         &mut self,
-        result: &'header mut Headers,
-    ) -> Result<Status<(&'header mut Headers)>>
+        result: &'headers mut Headers,
+    ) -> Result<Status<(&'headers mut Headers)>>
     where
-        'buffer: 'header,
-        Headers: 'header + HeaderFieldCollection<'buffer>,
+        Headers: 'headers + HeaderFieldCollection<'buffer>,
     {
         loop {
             if complete!(self.skip_eol()?) {

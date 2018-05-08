@@ -20,7 +20,7 @@ mod request {
                 _ => assert!(false),
             }
 
-            fn closure<'a, 'b>($req: Request<'a, 'b, Vec<HeaderField<'a>>>) {
+            fn closure<'a, 'b>($req: Request<'a, 'b, Vec<HeaderField<'b>>>) {
                 $body
             }
         }};
@@ -184,7 +184,7 @@ mod response {
                 _ => assert!(false),
             }
 
-            fn closure<'a, 'b>($res: Response<'a, 'b, Vec<HeaderField<'a>>>) {
+            fn closure<'a, 'b>($res: Response<'a, 'b, Vec<HeaderField<'b>>>) {
                 $body
             }
         }};
