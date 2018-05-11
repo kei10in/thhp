@@ -442,7 +442,7 @@ impl<'buffer> HttpPartParser<'buffer> {
         result: &'headers mut Headers,
     ) -> Result<Status<(&'headers [HeaderField<'buffer>])>>
     where
-        Headers: 'headers + HeaderFieldCollection<'buffer>,
+        Headers: HeaderFieldCollection<'buffer>,
     {
         loop {
             if complete!(self.skip_eol()?) {
