@@ -20,7 +20,7 @@ mod request {
                 _ => assert!(false),
             }
 
-            fn closure<'a, 'b>($req: Request<'a, 'b>) {
+            fn closure($req: Request) {
                 $body
             }
         }};
@@ -184,7 +184,7 @@ mod response {
                 _ => assert!(false),
             }
 
-            fn closure<'a, 'b>($res: Response<'a, 'b>) {
+            fn closure($res: Response) {
                 $body
             }
         }};
