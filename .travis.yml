@@ -16,7 +16,13 @@ script:
 addons:
   apt:
     packages:
+      - binutils-dev
+      - cmake
+      - gcc
+      - libcurl4-openssl-dev
+      - libdw-dev
       - libelf-dev
+      - libiberty-dev
 after_success:
   - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then
       cargo bench --verbose;
