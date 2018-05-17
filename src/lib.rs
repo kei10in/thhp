@@ -82,7 +82,7 @@ macro_rules! complete {
 /// ```no_run
 /// let buf = b"GET / HTTP/1.1\r\nHost: example.com";
 /// let mut headers = Vec::<thhp::HeaderField>::with_capacity(16);
-/// match thhp::Request::Parse(req, &mut headers) {
+/// match thhp::Request::parse(buf, &mut headers) {
 ///     Ok(thhp::Complete((ref req, len))) => {
 ///         // Use request.
 ///     },
@@ -129,7 +129,7 @@ impl<'headers, 'buffer: 'headers> Request<'headers, 'buffer> {
 /// ```no_run
 /// let buf = b"HTTP/1.1 200 OK\r\nHost: example.com";
 /// let mut headers = Vec::<thhp::HeaderField>::with_capacity(16);
-/// match thhp::Response::parse(req, &mut headers) {
+/// match thhp::Response::parse(buf, &mut headers) {
 ///     Ok(thhp::Complete((ref res, len))) => {
 ///         // Use reqest.
 ///     },
