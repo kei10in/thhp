@@ -2,6 +2,11 @@
 name = "thhp"
 version = "0.1.0"
 authors = ["kei10in <kei10in@gmail.com>"]
+license = "MIT"
+description = "Very Fast HTTP Parser"
+repository = "https://github.com/kei10in/thhp"
+keywords = ["http", "parser", "no_std"]
+categories = ["network-programming", "no-std", "parser-implementations", "web-programming"]
 
 [dependencies.arrayvec]
 version = "0.4"
