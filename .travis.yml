@@ -13,6 +13,10 @@ cache:
 script:
   - cargo build --verbose
   - cargo test --verbose
+addons:
+  apt:
+    packages:
+      - libelf-dev
 after_success:
   - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then
       cargo bench --verbose;
