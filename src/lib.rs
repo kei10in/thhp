@@ -1,7 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc))]
 #![cfg_attr(feature = "nightly", feature(stdsimd))]
-
+//! # thhp
+//!
+//! A parser library for HTTP/1.x requests and responses.
 #[cfg(not(feature = "std"))]
 extern crate core as std;
 
@@ -24,15 +26,22 @@ mod vec_header;
 pub use errors::*;
 use scanner::Scanner;
 
+/// A variants of parsing status.
+///
+/// `Complete` is used when done and succeeded.
+/// `Incomplete` is used when valid but parsing ended prematurely.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Status<T> {
+    /// Represents parsing is done and succeeded completely.
     Complete(T),
+    /// Represents parsing is not done but valid.
     Incomplete,
 }
 
 pub use Status::*;
 
 impl<T> Status<T> {
+    /// Unwraps a status if `Complete(v)`.
     pub fn unwrap(self) -> T {
         match self {
             Complete(val) => val,
@@ -40,6 +49,7 @@ impl<T> Status<T> {
         }
     }
 
+    /// Returns `true` if the status is a `Complete`.
     pub fn is_complete(&self) -> bool {
         match *self {
             Complete(_) => true,
@@ -47,6 +57,7 @@ impl<T> Status<T> {
         }
     }
 
+    /// Returns `true` if the status is a `Incomplete`.
     pub fn is_incomplete(&self) -> bool {
         match *self {
             Complete(_) => false,
@@ -64,14 +75,38 @@ macro_rules! complete {
     };
 }
 
+/// A parsed request.
+///
+/// ## Example
+///
+/// ```no_run
+/// let buf = b"GET / HTTP/1.1\r\nHost: example.com";
+/// let mut headers = Vec::<thhp::HeaderField>::with_capacity(16);
+/// match thhp::Request::Parse(req, &mut headers) {
+///     Ok(thhp::Complete((ref req, len))) => {
+///         // Use request.
+///     },
+///     Ok(thhp::Incomplete) => {
+///         // Read more and parse again.
+///     },
+///     Err(err) => {
+///         // Handle error.
+///     }
+/// }
+/// ```
 pub struct Request<'headers, 'buffer: 'headers> {
+    /// The request method.
     pub method: &'buffer str,
+    /// The request target.
     pub target: &'buffer str,
+    /// The http minor version.
     pub minor_version: u8,
+    /// The request header fields.
     pub headers: &'headers [HeaderField<'buffer>],
 }
 
 impl<'headers, 'buffer: 'headers> Request<'headers, 'buffer> {
+    /// Parse the buffer as http request.
     pub fn parse<Headers>(
         buf: &'buffer [u8],
         headers: &'headers mut Headers,
@@ -87,14 +122,38 @@ impl<'headers, 'buffer: 'headers> Request<'headers, 'buffer> {
     }
 }
 
+/// A parsed response.
+///
+/// ## Example
+///
+/// ```no_run
+/// let buf = b"HTTP/1.1 200 OK\r\nHost: example.com";
+/// let mut headers = Vec::<thhp::HeaderField>::with_capacity(16);
+/// match thhp::Response::parse(req, &mut headers) {
+///     Ok(thhp::Complete((ref res, len))) => {
+///         // Use reqest.
+///     },
+///     Ok(thhp::Incomplete) => {
+///         // Read more and parse again.
+///     },
+///     Err(err) => {
+///         // Handle error.
+///     }
+/// }
+/// ```
 pub struct Response<'headers, 'buffer: 'headers> {
+    /// The http minor version.
     pub minor_version: u8,
+    /// The status code.
     pub status: u16,
+    /// The reason phrase
     pub reason: &'buffer str,
+    /// The response header fields.
     pub headers: &'headers [HeaderField<'buffer>],
 }
 
 impl<'headers, 'buffer: 'headers> Response<'headers, 'buffer> {
+    /// Parse the buffer as http response.
     pub fn parse<Headers>(
         buf: &'buffer [u8],
         headers: &'headers mut Headers,
@@ -110,11 +169,15 @@ impl<'headers, 'buffer: 'headers> Response<'headers, 'buffer> {
     }
 }
 
+/// A parsed header field.
 pub struct HeaderField<'buffer> {
+    /// The header field name.
     pub name: &'buffer str,
+    /// The header field value.
     pub value: &'buffer str,
 }
 
+/// Trait for a container of header fields.
 pub trait HeaderFieldCollection<'buffer>: ops::Deref<Target = [HeaderField<'buffer>]> {
     fn push(&mut self, header_field: HeaderField<'buffer>) -> Result<()>;
 }

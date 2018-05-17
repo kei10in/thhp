@@ -1,13 +1,23 @@
+/// An error in parsing the http header.
 #[derive(Debug, Hash, PartialEq)]
 pub enum Error {
+    /// Invalid byte in header field name.
     InvalidFieldName,
+    /// Invalid byte in header field value.
     InvalidFieldValue,
+    /// Invalid byte in newline.
     InvalidNewLine,
+    /// Invalid byte in http version.
     InvalidVersion,
+    /// Invalid byte in request method.
     InvalidMethod,
+    /// Invalid byte in request target.
     InvalidPath,
+    /// Invalid byte in status code.
     InvalidStatusCode,
+    /// Invalid byte in reason phrase.
     InvalidReasonPhrase,
+    /// Too many header fields.
     OutOfCapacity,
 }
 
@@ -42,4 +52,5 @@ impl ::std::error::Error for Error {
     }
 }
 
+/// A result type in parsing http header.
 pub type Result<T> = ::std::result::Result<T, Error>;
