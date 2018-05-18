@@ -1,6 +1,6 @@
 language: rust
 dist: trusty
-sudo: false
+sudo: required
 rust:
   - nightly
   - beta
