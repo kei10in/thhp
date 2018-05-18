@@ -7,12 +7,13 @@ rust:
   - stable
   - 1.20.0
 cache:
+  apt: true
   directoriesca:
     - target/debug/deps
     - target/debug/build
 script:
-  - cargo build --verbose
-  - cargo test --verbose
+  - cargo build
+  - cargo test
 addons:
   apt:
     packages:
@@ -25,7 +26,7 @@ addons:
       - libiberty-dev
 after_success:
   - if [ "$TRAVIS_RUST_VERSION" == "nightly" ]; then
-      cargo bench --verbose;
+      cargo bench;
     fi
   - |
     [ $TRAVIS_RUST_VERSION = stable ] &&
@@ -40,7 +41,7 @@ after_success:
     make install &&
     cd ../.. &&
     rm -rf kcov-master &&
-    for file in target/debug/thhp-*[^\.d]; do
+    for file in target/debug/(thhp|tests)-*[^\.d]; do
       mkdir -p "target/cov/$(basename $file)";
       kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file";
     done &&
