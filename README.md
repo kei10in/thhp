@@ -1,5 +1,6 @@
 # Very Fast HTTP Paser - Totemo-Hayai (とても速い) HTTP Parser
 
+[![crates.io](https://img.shields.io/crates/v/finchers.svg)](https://crates.io/crates/thhp)
 [![Build Status](https://travis-ci.org/kei10in/thhp.svg?branch=master)](https://travis-ci.org/kei10in/thhp)
 [![codecov](https://codecov.io/gh/kei10in/thhp/branch/master/graph/badge.svg)](https://codecov.io/gh/kei10in/thhp)
 
