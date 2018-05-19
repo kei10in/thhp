@@ -5,6 +5,7 @@ authors = ["kei10in <kei10in@gmail.com>"]
 license = "MIT"
 description = "Very Fast HTTP Parser"
 repository = "https://github.com/kei10in/thhp"
+readme = "README.md"
 keywords = ["http", "parser", "no_std"]
 categories = ["network-programming", "no-std", "parser-implementations", "web-programming"]
 

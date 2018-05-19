@@ -3,6 +3,23 @@
 [![Build Status](https://travis-ci.org/kei10in/thhp.svg?branch=master)](https://travis-ci.org/kei10in/thhp)
 [![codecov](https://codecov.io/gh/kei10in/thhp/branch/master/graph/badge.svg)](https://codecov.io/gh/kei10in/thhp)
 
+## Usage
+
+  ```rust
+  let buf = b"GET / HTTP/1.1\r\nHost: example.com";
+  let mut headers = Vec::<thhp::HeaderField>::with_capacity(16);
+  match thhp::Request::parse(buf, &mut headers) {
+     Ok(thhp::Complete((ref req, len))) => {
+         // Use request.
+     },
+     Ok(thhp::Incomplete) => {
+         // Read more and parse again.
+     },
+     Err(err) => {
+         // Handle error.
+     }
+  }
+  ```
 
 
 ## Benchmark
