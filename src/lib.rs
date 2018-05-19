@@ -705,27 +705,35 @@ mod tests {
     fn parse_a_header_field() {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
         let mut parser = HttpPartParser::new(b"name:value\r\n\r\n");
-        if let Ok(Complete(ref hs)) = parser.parse_headers(&mut headers) {
-            assert_eq!(hs.len(), 1);
-            assert_eq!(hs[0].name, "name");
-            assert_eq!(hs[0].value, "value");
-        } else {
-            assert!(false);
-        }
+
+        let r = parser.parse_headers(&mut headers);
+        assert!(r.is_ok());
+
+        let s = r.unwrap();
+        assert!(s.is_complete());
+
+        let hs = s.unwrap();
+        assert_eq!(hs.len(), 1);
+        assert_eq!(hs[0].name, "name");
+        assert_eq!(hs[0].value, "value");
     }
 
     #[test]
     fn parse_2_header_fields() {
         let mut headers = Vec::<HeaderField>::with_capacity(10);
         let mut parser = HttpPartParser::new(b"name1:value1\r\nname2:value2\r\n\r\n");
-        if let Ok(Complete(ref hs)) = parser.parse_headers(&mut headers) {
-            assert_eq!(hs.len(), 2);
-            assert_eq!(hs[0].name, "name1");
-            assert_eq!(hs[0].value, "value1");
-            assert_eq!(hs[1].name, "name2");
-            assert_eq!(hs[1].value, "value2");
-        } else {
-            assert!(false);
-        }
+
+        let r = parser.parse_headers(&mut headers);
+        assert!(r.is_ok());
+
+        let s = r.unwrap();
+        assert!(s.is_complete());
+
+        let hs = s.unwrap();
+        assert_eq!(hs.len(), 2);
+        assert_eq!(hs[0].name, "name1");
+        assert_eq!(hs[0].value, "value1");
+        assert_eq!(hs[1].name, "name2");
+        assert_eq!(hs[1].value, "value2");
     }
 }
