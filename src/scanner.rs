@@ -178,10 +178,24 @@ mod tests {
 
     #[test]
     fn test_read_while() {
-        let mut s = Scanner::new(b"GET / ");
+        macro_rules! check_read_while {
+            ($buf:expr, $expect:expr) => {
+                let mut s = Scanner::new($buf);
+                let r = s.read_while(|x| b'A' <= x && x <= b'Z');
+                assert!(r.is_some());
+                assert_eq!(r.unwrap(), $expect.as_ref());
+            };
+        }
 
-        let r1 = s.read_while(|x| b'A' <= x && x <= b'Z');
-        assert_eq!(r1, Some(b"GET".as_ref()));
+        check_read_while!(b"A ", b"A");
+        check_read_while!(b"AB ", b"AB");
+        check_read_while!(b"ABC ", b"ABC");
+        check_read_while!(b"ABCD ", b"ABCD");
+        check_read_while!(b"ABCDE ", b"ABCDE");
+        check_read_while!(b"ABCDEF ", b"ABCDEF");
+        check_read_while!(b"ABCDEFG ", b"ABCDEFG");
+        check_read_while!(b"ABCDEFGH ", b"ABCDEFGH");
+        check_read_while!(b"ABCDEFGHI ", b"ABCDEFGHI");
     }
 
     #[test]
