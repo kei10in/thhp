@@ -474,7 +474,8 @@ impl<'buffer> HttpPartParser<'buffer> {
     fn parse_http_version(&mut self) -> Result<Status<u8>> {
         if let Some(http) = self.scanner.read(8) {
             unsafe {
-                if *http.get_unchecked(0) == b'H' && *http.get_unchecked(1) == b'T'
+                if *http.get_unchecked(0) == b'H'
+                    && *http.get_unchecked(1) == b'T'
                     && *http.get_unchecked(2) == b'T'
                     && *http.get_unchecked(3) == b'P'
                     && *http.get_unchecked(4) == b'/'
@@ -561,7 +562,8 @@ impl<'buffer> HttpPartParser<'buffer> {
         {
             if is_x86_feature_detected!("sse4.2") {
                 let range = b"\x00\x08\x0A\x1F\x7F\xFF".into();
-                return self.scanner
+                return self
+                    .scanner
                     .read_while_fast(&range, |x| is_field_value_char(x));
             } else {
                 return self.scanner.read_while(|x| is_field_value_char(x));
