@@ -132,6 +132,7 @@ mod request {
     fn bad_request() {
         invalid_method!(b"G\x01ET / HTTP/1.1\r\n\r\n");
         invalid_path!(b"GET /a\x01ef HTTP/1.1\r\n\r\n");
+        invalid_version!(b"GET / H\r\n\r\n");
         invalid_version!(b"GET / HOGE\r\n\r\n");
         invalid_version!(b"GET / HTTP/11.1\r\n\r\n");
         invalid_version!(b"GET / HTTP/A.1\r\n\r\n");
@@ -276,6 +277,7 @@ mod response {
 
     #[test]
     fn bad_response() {
+        invalid_version!(b"ABC\r\n\r\n");
         invalid_version!(b"HOGE/1.1 200 OK\r\n\r\n");
         invalid_version!(b"HTTP/11.1 200 OK\r\n\r\n");
         invalid_version!(b"HTTP/A.1 200 OK\r\n\r\n");
