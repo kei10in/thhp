@@ -1,6 +1,6 @@
 [package]
 name = "thhp"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["kei10in <kei10in@gmail.com>"]
 license = "MIT"
 description = "Very Fast HTTP Parser"
