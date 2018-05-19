@@ -30,7 +30,7 @@ use scanner::Scanner;
 ///
 /// `Complete` is used when done and succeeded.
 /// `Incomplete` is used when valid but parsing ended prematurely.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Status<T> {
     /// Represents parsing is done and succeeded completely.
     Complete(T),
@@ -94,6 +94,7 @@ macro_rules! complete {
 ///     }
 /// }
 /// ```
+#[derive(Debug, PartialEq)]
 pub struct Request<'headers, 'buffer: 'headers> {
     /// The request method.
     pub method: &'buffer str,
@@ -141,6 +142,7 @@ impl<'headers, 'buffer: 'headers> Request<'headers, 'buffer> {
 ///     }
 /// }
 /// ```
+#[derive(Debug, PartialEq)]
 pub struct Response<'headers, 'buffer: 'headers> {
     /// The http minor version.
     pub minor_version: u8,
@@ -170,6 +172,7 @@ impl<'headers, 'buffer: 'headers> Response<'headers, 'buffer> {
 }
 
 /// A parsed header field.
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct HeaderField<'buffer> {
     /// The header field name.
     pub name: &'buffer str,

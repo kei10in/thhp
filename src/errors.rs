@@ -1,5 +1,5 @@
 /// An error in parsing the http header.
-#[derive(Debug, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Error {
     /// Invalid byte in header field name.
     InvalidFieldName,
