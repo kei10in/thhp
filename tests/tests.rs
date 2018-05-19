@@ -138,6 +138,7 @@ mod request {
         invalid_version!(b"GET / HTTP/A.1\r\n\r\n");
         invalid_version!(b"GET / HTTP/1.A\r\n\r\n");
         invalid_version!(b"GET / HTTP/1.A\r\n\r\n");
+        invalid_version!(b"GET / HTTP/1.1A\r\n\r\n");
         invalid_field_name!(b"GET / HTTP/1.1\r\na\x01b:xyz\r\n\r\n");
         invalid_field_value!(b"GET / HTTP/1.1\r\nabc:x\x01z\r\n\r\n");
         invalid_new_line!(b"GET / HTTP/1.1\r\nabc:xyz\ra\n\r\n");
@@ -286,6 +287,7 @@ mod response {
         invalid_status_code!(b"HTTP/1.1 20 OK\r\na:b\r\n\r\n");
         invalid_status_code!(b"HTTP/1.1 2000 OK\r\na:b\r\n\r\n");
         invalid_status_code!(b"HTTP/1.1 2A00 OK\r\na:b\r\n\r\n");
+        invalid_status_code!(b"HTTP/1.1 200OK\r\na:b\r\n\r\n");
         invalid_reason_phrase!(b"HTTP/1.1 200 O\x01K\r\na:b\r\n\r\n");
         invalid_reason_phrase!(b"HTTP/1.1 200 O\x01K\r\na:b\r\n\r\n");
         invalid_reason_phrase!(b"HTTP/1.1 200 O\x01K\r\na\x01:b\r\n\r\n");

@@ -660,6 +660,24 @@ mod tests {
     use *;
 
     #[test]
+    #[should_panic]
+    fn unwrap_incomplete_status_causes_panic() {
+        let v: Status<i32> = Incomplete;
+        v.unwrap();
+    }
+
+    #[test]
+    fn check_complete_or_incomplete() {
+        let comp = Complete(10);
+        assert!(comp.is_complete());
+        assert!(!comp.is_incomplete());
+
+        let incomp: Status<i32> = Incomplete;
+        assert!(incomp.is_incomplete());
+        assert!(!incomp.is_complete());
+    }
+
+    #[test]
     fn http_part_parser_request_test() {
         let mut parser = HttpPartParser::new(b"GET / HTTP/1.1\r\na:b\r\n\r\n");
         let method = parser.parse_request_method();
