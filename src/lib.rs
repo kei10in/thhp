@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc))]
+#![cfg_attr(feature = "nightly", feature(const_fn))]
 #![cfg_attr(feature = "nightly", feature(stdsimd))]
 //! # thhp
 //!
@@ -324,6 +325,10 @@ fn is_field_value_char(c: u8) -> bool {
     FIELD_VALUE_CHAR_MAP[c as usize]
 }
 
+#[cfg(feature = "nightly")]
+const FIELD_VALUE_CHAR_RANGES: simd::CharRanges =
+    simd::CharRanges::new6(b"\x00\x08\x0A\x1F\x7F\xFF");
+
 struct HttpPartParser<'buffer> {
     scanner: Scanner<'buffer>,
 }
@@ -564,10 +569,9 @@ impl<'buffer> HttpPartParser<'buffer> {
         #[cfg(feature = "nightly")]
         {
             if is_x86_feature_detected!("sse4.2") {
-                let range = b"\x00\x08\x0A\x1F\x7F\xFF".into();
                 return self
                     .scanner
-                    .read_while_fast(&range, |x| is_field_value_char(x));
+                    .read_while_fast(&FIELD_VALUE_CHAR_RANGES, |x| is_field_value_char(x));
             } else {
                 return self.scanner.read_while(|x| is_field_value_char(x));
             }

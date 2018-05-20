@@ -13,29 +13,33 @@ pub struct CharRanges {
     len: i32,
 }
 
-impl<'a> Into<CharRanges> for &'a [u8; 2] {
-    fn into(self) -> CharRanges {
-        let x0 = self[0];
-        let x1 = self[1];
+impl CharRanges {
+    pub const fn new2(v: &[u8; 2]) -> CharRanges {
         CharRanges {
-            value: u8x16::new(x0, x1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            value: u8x16::new(v[0], v[1], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             len: 2,
         }
+    }
+
+    pub const fn new6(v: &[u8; 6]) -> CharRanges {
+        CharRanges {
+            value: u8x16::new(
+                v[0], v[1], v[2], v[3], v[4], v[5], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ),
+            len: 6,
+        }
+    }
+}
+
+impl<'a> Into<CharRanges> for &'a [u8; 2] {
+    fn into(self) -> CharRanges {
+        CharRanges::new2(self)
     }
 }
 
 impl<'a> Into<CharRanges> for &'a [u8; 6] {
     fn into(self) -> CharRanges {
-        let x0 = self[0];
-        let x1 = self[1];
-        let x2 = self[2];
-        let x3 = self[3];
-        let x4 = self[4];
-        let x5 = self[5];
-        CharRanges {
-            value: u8x16::new(x0, x1, x2, x3, x4, x5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-            len: 6,
-        }
+        CharRanges::new6(self)
     }
 }
 
