@@ -7,40 +7,28 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 use std::convert::*;
 
-use packed_simd::*;
-
 pub struct CharRanges {
-    value: u8x16,
-    len: i32,
-}
-
-impl CharRanges {
-    pub const fn new2(v: &[u8; 2]) -> CharRanges {
-        CharRanges {
-            value: u8x16::new(v[0], v[1], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-            len: 2,
-        }
-    }
-
-    pub const fn new6(v: &[u8; 6]) -> CharRanges {
-        CharRanges {
-            value: u8x16::new(
-                v[0], v[1], v[2], v[3], v[4], v[5], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            ),
-            len: 6,
-        }
-    }
+    pub value: [u8; 16],
+    pub len: i32,
 }
 
 impl<'a> Into<CharRanges> for &'a [u8; 2] {
     fn into(self) -> CharRanges {
-        CharRanges::new2(self)
+        CharRanges {
+            value: [self[0], self[1], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            len: 2,
+        }
     }
 }
 
 impl<'a> Into<CharRanges> for &'a [u8; 6] {
     fn into(self) -> CharRanges {
-        CharRanges::new6(self)
+        CharRanges {
+            value: [
+                self[0], self[1], self[2], self[3], self[4], self[5], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ],
+            len: 6,
+        }
     }
 }
 
@@ -63,11 +51,11 @@ pub fn index_of_range_or_last_16bytes_boundary(buffer: &[u8], range: &CharRanges
 
 #[inline]
 fn find_fast(buffer: &[u8], range: &CharRanges) -> usize {
-    debug_assert!(buffer.len() <= 16);
+    debug_assert!(buffer.len() == 16);
 
     unsafe {
-        let a = __m128i::from_bits(range.value);
-        let b = __m128i::from_bits(u8x16::from_slice_unaligned_unchecked(buffer));
+        let a = _mm_lddqu_si128(range.value.as_ptr() as *const _);
+        let b = _mm_lddqu_si128(buffer.as_ptr() as *const _);
 
         let i = _mm_cmpestri(
             a,

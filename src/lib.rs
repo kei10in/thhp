@@ -11,9 +11,6 @@ extern crate core as std;
 use std::ops;
 use std::str;
 
-#[cfg(feature = "nightly")]
-extern crate packed_simd;
-
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
@@ -329,8 +326,13 @@ fn is_field_value_char(c: u8) -> bool {
 }
 
 #[cfg(feature = "nightly")]
-const FIELD_VALUE_CHAR_RANGES: simd::CharRanges =
-    simd::CharRanges::new6(b"\x00\x08\x0A\x1F\x7F\xFF");
+const FIELD_VALUE_CHAR_RANGES: simd::CharRanges = simd::CharRanges {
+    value: [
+        0x00, 0x08, 0x0A, 0x1F, 0x7F, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00,
+    ],
+    len: 6,
+};
 
 struct HttpPartParser<'buffer> {
     scanner: Scanner<'buffer>,
