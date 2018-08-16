@@ -28,4 +28,4 @@ opt-level = 3
 [features]
 default = [ "std" ]
 std = []
-nightly = ["picohttpparser-sys/sse4"]
+simd = ["picohttpparser-sys/sse4"]

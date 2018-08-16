@@ -1,7 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc))]
-#![cfg_attr(feature = "nightly", feature(const_fn))]
-#![cfg_attr(feature = "nightly", feature(stdsimd))]
 //! # thhp
 //!
 //! A parser library for HTTP/1.x requests and responses.
@@ -325,7 +323,7 @@ fn is_field_value_char(c: u8) -> bool {
     FIELD_VALUE_CHAR_MAP[c as usize]
 }
 
-#[cfg(feature = "nightly")]
+#[cfg(feature = "simd")]
 const FIELD_VALUE_CHAR_RANGES: simd::CharRanges = simd::CharRanges {
     value: [
         0x00, 0x08, 0x0A, 0x1F, 0x7F, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -571,7 +569,7 @@ impl<'buffer> HttpPartParser<'buffer> {
 
     #[inline]
     fn read_field_value(&mut self) -> Option<&'buffer [u8]> {
-        #[cfg(feature = "nightly")]
+        #[cfg(feature = "simd")]
         {
             if is_x86_feature_detected!("sse4.2") {
                 return self
@@ -582,7 +580,7 @@ impl<'buffer> HttpPartParser<'buffer> {
             }
         }
 
-        #[cfg(not(feature = "nightly"))]
+        #[cfg(not(feature = "simd"))]
         return self.scanner.read_while(|x| is_field_value_char(x));
     }
 
