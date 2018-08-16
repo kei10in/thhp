@@ -6,7 +6,8 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 use std::convert::*;
-use std::simd::*;
+
+use packed_simd::*;
 
 pub struct CharRanges {
     value: u8x16,
@@ -66,7 +67,7 @@ fn find_fast(buffer: &[u8], range: &CharRanges) -> usize {
 
     unsafe {
         let a = __m128i::from_bits(range.value);
-        let b = __m128i::from_bits(u8x16::load_unaligned_unchecked(buffer));
+        let b = __m128i::from_bits(u8x16::from_slice_unaligned_unchecked(buffer));
 
         let i = _mm_cmpestri(
             a,

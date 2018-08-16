@@ -13,6 +13,11 @@ categories = ["network-programming", "no-std", "parser-implementations", "web-pr
 version = "0.4"
 optional = true
 
+[dependencies.packed_simd]
+version = "0.1.0"
+optional = true
+features = ["into_bits"]
+
 [dev-dependencies]
 httparse = "1.2"
 
@@ -28,4 +33,4 @@ opt-level = 3
 [features]
 default = [ "std" ]
 std = []
-nightly = [ "picohttpparser-sys/sse4" ]
+nightly = [ "picohttpparser-sys/sse4", "packed_simd" ]

@@ -11,6 +11,9 @@ extern crate core as std;
 use std::ops;
 use std::str;
 
+#[cfg(feature = "nightly")]
+extern crate packed_simd;
+
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
