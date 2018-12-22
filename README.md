@@ -42,7 +42,7 @@ test bench_thhp_short           ... bench:          35 ns/iter (+/- 5) = 1600 MB
 ### Use SSE4.2 implicitly
 
 ```
-$ rustup run nightly cargo bench
+$ cargo +nightly bench
 ...
 test bench_httparse             ... bench:         208 ns/iter (+/- 26) = 3379 MB/s
 test bench_httparse_short       ... bench:          41 ns/iter (+/- 4) = 1365 MB/s
