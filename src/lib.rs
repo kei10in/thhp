@@ -22,8 +22,8 @@ mod scanner;
 mod simd;
 mod vec_header;
 
-pub use errors::*;
-use scanner::Scanner;
+pub use crate::errors::*;
+use crate::scanner::Scanner;
 
 /// A variants of parsing status.
 ///
@@ -37,7 +37,7 @@ pub enum Status<T> {
     Incomplete,
 }
 
-pub use Status::*;
+pub use crate::Status::*;
 
 impl<T> Status<T> {
     /// Unwraps a status if `Complete(v)`.
@@ -667,7 +667,7 @@ mod tests {
     #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
 
-    use *;
+    use crate::*;
 
     #[test]
     #[should_panic]

@@ -1,8 +1,8 @@
 #[cfg(thhp_enable_sse42)]
-use simd;
+use crate::simd;
 
 #[cfg(thhp_enable_sse42)]
-pub use simd::CharRanges;
+pub use crate::simd::CharRanges;
 
 pub struct Scanner<'a> {
     buffer: &'a [u8],
@@ -152,7 +152,7 @@ impl<'a> Scanner<'a> {
 
 #[cfg(test)]
 mod tests {
-    use scanner::*;
+    use crate::scanner::*;
 
     #[test]
     fn test_skip_if() {
@@ -217,7 +217,7 @@ mod tests {
     mod simd {
         #![cfg(thhp_enable_sse42)]
 
-        use scanner::*;
+        use crate::scanner::*;
 
         macro_rules! check {
             ($buf:expr, $expect:expr) => {

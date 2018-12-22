@@ -21,7 +21,7 @@ pub enum Error {
     OutOfCapacity,
 }
 
-pub use Error::*;
+pub use crate::Error::*;
 
 impl Error {
     pub fn as_str(&self) -> &'static str {

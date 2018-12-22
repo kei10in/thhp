@@ -4,7 +4,7 @@ use thhp::*;
 
 #[cfg(test)]
 mod request {
-    use *;
+    use crate::*;
 
     macro_rules! good {
         ($buf:expr) => {
@@ -170,7 +170,7 @@ mod request {
 
 #[cfg(test)]
 mod response {
-    use *;
+    use crate::*;
 
     macro_rules! good {
         ($buf:expr) => {

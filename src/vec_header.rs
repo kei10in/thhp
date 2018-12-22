@@ -1,9 +1,9 @@
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
-use errors::*;
-use HeaderField;
-use HeaderFieldCollection;
+use crate::errors::*;
+use crate::HeaderField;
+use crate::HeaderFieldCollection;
 
 /// A basic implementation of `HeaderFieldCollection`.
 impl<'buffer> HeaderFieldCollection<'buffer> for Vec<HeaderField<'buffer>> {

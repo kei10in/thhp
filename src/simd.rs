@@ -70,7 +70,7 @@ fn find_fast(buffer: &[u8], range: &CharRanges) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use simd::*;
+    use crate::simd::*;
 
     macro_rules! check {
         ($buf:expr, $range:expr, $index:expr, $found:expr) => {
