@@ -7,49 +7,48 @@
 
 ## Usage
 
-  ```rust
-  let buf = b"GET / HTTP/1.1\r\nHost: example.com";
-  let mut headers = Vec::<thhp::HeaderField>::with_capacity(16);
-  match thhp::Request::parse(buf, &mut headers) {
-     Ok(thhp::Complete((ref req, len))) => {
-         // Use request.
-     },
-     Ok(thhp::Incomplete) => {
-         // Read more and parse again.
-     },
-     Err(err) => {
-         // Handle error.
-     }
-  }
-  ```
-
+```rust
+let buf = b"GET / HTTP/1.1\r\nHost: example.com";
+let mut headers = Vec::<thhp::HeaderField>::with_capacity(16);
+match thhp::Request::parse(buf, &mut headers) {
+   Ok(thhp::Complete((ref req, len))) => {
+       // Use request.
+   },
+   Ok(thhp::Incomplete) => {
+       // Read more and parse again.
+   },
+   Err(err) => {
+       // Handle error.
+   }
+}
+```
 
 ## Benchmark
 
-### With SSE4.2
+### Use SSE4.2 explicitly
 
-  ```
-  $ RUSTFLAGS="-C target-feature=+sse4.2" rustup run nightly cargo bench --features=nightly
-  ...
-  test bench_httparse             ... bench:         404 ns/iter (+/- 28) = 1740 MB/s
-  test bench_httparse_short       ... bench:          44 ns/iter (+/- 1) = 1272 MB/s
-  test bench_picohttpparser       ... bench:         199 ns/iter (+/- 7) = 3532 MB/s
-  test bench_picohttpparser_short ... bench:          57 ns/iter (+/- 2) = 982 MB/s
-  test bench_thhp                 ... bench:         219 ns/iter (+/- 18) = 3210 MB/s
-  test bench_thhp_short           ... bench:          41 ns/iter (+/- 3) = 1365 MB/s
-  ...
-  ```
+```
+$ RUSTFLAGS="-C target-feature=+sse4.2" cargo +nightly bench
+...
+test bench_httparse             ... bench:         279 ns/iter (+/- 18) = 2519 MB/s
+test bench_httparse_short       ... bench:          41 ns/iter (+/- 9) = 1365 MB/s
+test bench_picohttpparser       ... bench:         160 ns/iter (+/- 37) = 4393 MB/s
+test bench_picohttpparser_short ... bench:          45 ns/iter (+/- 5) = 1244 MB/s
+test bench_thhp                 ... bench:         159 ns/iter (+/- 23) = 4421 MB/s
+test bench_thhp_short           ... bench:          35 ns/iter (+/- 5) = 1600 MB/s
+...
+```
 
-### Without SIMD
+### Use SSE4.2 implicitly
 
-  ```
-  $ rustup run nightly cargo bench
-  ...
-  test bench_httparse             ... bench:         407 ns/iter (+/- 50) = 1727 MB/s
-  test bench_httparse_short       ... bench:          43 ns/iter (+/- 7) = 1302 MB/s
-  test bench_picohttpparser       ... bench:         321 ns/iter (+/- 31) = 2190 MB/s
-  test bench_picohttpparser_short ... bench:          46 ns/iter (+/- 4) = 1217 MB/s
-  test bench_thhp                 ... bench:         308 ns/iter (+/- 21) = 2282 MB/s
-  test bench_thhp_short           ... bench:          43 ns/iter (+/- 2) = 1302 MB/s
-  ...
-  ```
+```
+$ rustup run nightly cargo bench
+...
+test bench_httparse             ... bench:         208 ns/iter (+/- 26) = 3379 MB/s
+test bench_httparse_short       ... bench:          41 ns/iter (+/- 4) = 1365 MB/s
+test bench_picohttpparser       ... bench:         153 ns/iter (+/- 24) = 4594 MB/s
+test bench_picohttpparser_short ... bench:          42 ns/iter (+/- 7) = 1333 MB/s
+test bench_thhp                 ... bench:         198 ns/iter (+/- 33) = 3550 MB/s
+test bench_thhp_short           ... bench:          37 ns/iter (+/- 8) = 1513 MB/s
+...
+```
