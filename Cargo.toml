@@ -8,10 +8,14 @@ repository = "https://github.com/kei10in/thhp"
 readme = "README.md"
 keywords = ["http", "parser", "no_std"]
 categories = ["network-programming", "no-std", "parser-implementations", "web-programming"]
+build = "build.rs"
 
 [dependencies.arrayvec]
 version = "0.4"
 optional = true
+
+[build-dependencies]
+version_check = "0.1"
 
 [dev-dependencies]
 httparse = "1.2"
@@ -19,6 +23,7 @@ httparse = "1.2"
 [dev-dependencies.picohttpparser-sys]
 version = "1.0"
 default-features = false
+features = ["sse4"]
 
 [profile.bench]
 lto = true
@@ -28,4 +33,4 @@ opt-level = 3
 [features]
 default = [ "std" ]
 std = []
-simd = ["picohttpparser-sys/sse4"]
+thhp_simd = []

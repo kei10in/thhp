@@ -1,7 +1,7 @@
-#[cfg(feature = "simd")]
+#[cfg(thhp_enable_sse42)]
 use simd;
 
-#[cfg(feature = "simd")]
+#[cfg(thhp_enable_sse42)]
 pub use simd::CharRanges;
 
 pub struct Scanner<'a> {
@@ -74,7 +74,7 @@ impl<'a> Scanner<'a> {
         self.read_while_continue_with(0, acceptable)
     }
 
-    #[cfg(feature = "simd")]
+    #[cfg(thhp_enable_sse42)]
     #[inline]
     pub fn read_while_fast<A>(&mut self, range: &CharRanges, acceptable: A) -> Option<&'a [u8]>
     where
@@ -215,7 +215,7 @@ mod tests {
     }
 
     mod simd {
-        #![cfg(feature = "simd")]
+        #![cfg(thhp_enable_sse42)]
 
         use scanner::*;
 

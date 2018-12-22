@@ -323,7 +323,7 @@ fn is_field_value_char(c: u8) -> bool {
     FIELD_VALUE_CHAR_MAP[c as usize]
 }
 
-#[cfg(feature = "simd")]
+#[cfg(thhp_enable_sse42)]
 const FIELD_VALUE_CHAR_RANGES: simd::CharRanges = simd::CharRanges {
     value: [
         0x00, 0x08, 0x0A, 0x1F, 0x7F, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -569,7 +569,7 @@ impl<'buffer> HttpPartParser<'buffer> {
 
     #[inline]
     fn read_field_value(&mut self) -> Option<&'buffer [u8]> {
-        #[cfg(feature = "simd")]
+        #[cfg(thhp_enable_sse42)]
         {
             if is_x86_feature_detected!("sse4.2") {
                 return self
@@ -580,7 +580,7 @@ impl<'buffer> HttpPartParser<'buffer> {
             }
         }
 
-        #[cfg(not(feature = "simd"))]
+        #[cfg(not(thhp_enable_sse42))]
         return self.scanner.read_while(|x| is_field_value_char(x));
     }
 

@@ -1,5 +1,4 @@
-#![cfg(feature = "simd")]
-#![cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#![cfg(all(thhp_enable_sse42, any(target_arch = "x86", target_arch = "x86_64")))]
 
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
