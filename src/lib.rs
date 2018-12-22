@@ -451,18 +451,20 @@ impl<'buffer> HttpPartParser<'buffer> {
     #[inline]
     fn parse_response_status_code(&mut self) -> Result<Status<u16>> {
         match self.scanner.read_while(|x| is_digit(x)) {
-            Some(v) => if v.len() == 3 {
-                if self.consume_space() {
-                    unsafe { str::from_utf8_unchecked(v) }
-                        .parse::<u16>()
-                        .map(|x| Complete(x))
-                        .or(Err(InvalidStatusCode))
+            Some(v) => {
+                if v.len() == 3 {
+                    if self.consume_space() {
+                        unsafe { str::from_utf8_unchecked(v) }
+                            .parse::<u16>()
+                            .map(|x| Complete(x))
+                            .or(Err(InvalidStatusCode))
+                    } else {
+                        Err(InvalidStatusCode)
+                    }
                 } else {
                     Err(InvalidStatusCode)
                 }
-            } else {
-                Err(InvalidStatusCode)
-            },
+            }
             None => Ok(Incomplete),
         }
     }
